@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: kids-finance-api
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://127.0.0.1:5433/kids_finance}
+    username: ${DB_USERNAME:kids_finance}
+    password: ${DB_PASSWORD}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+  flyway:
+    enabled: true
+
+server:
+  port: 8081
