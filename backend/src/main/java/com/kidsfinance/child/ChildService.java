@@ -1,7 +1,7 @@
-package com.kidsfinance.parent;
+package com.kidsfinance.child;
 
-import com.kidsfinance.parent.dto.request.CreateParentRequest;
-import com.kidsfinance.parent.dto.response.ParentResponse;
+import com.kidsfinance.child.dto.request.CreateChildRequest;
+import com.kidsfinance.child.dto.response.ChildResponse;
 import com.kidsfinance.user.User;
 import com.kidsfinance.user.UserRepository;
 import com.kidsfinance.user.UserRole;
@@ -12,24 +12,18 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-public class ParentService {
+public class ChildService {
 
     private final UserRepository userRepository;
-    private final ParentProfileRepository parentProfileRepository;
+    private final ChildProfileRepository childProfileRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Transactional
-    public ParentResponse createParent(CreateParentRequest request) {
+    public ChildResponse createChild(CreateChildRequest request) {
 
         if (userRepository.existsByUsername(request.username())) {
             throw new IllegalStateException(
                     "Username already exists"
-            );
-        }
-
-        if (parentProfileRepository.existsByEmail(request.email())) {
-            throw new IllegalStateException(
-                    "Email already exists"
             );
         }
 
@@ -38,26 +32,28 @@ public class ParentService {
                 .passwordHash(
                         passwordEncoder.encode(request.password())
                 )
-                .role(UserRole.PARENT)
+                .role(UserRole.CHILD)
                 .build();
 
         User savedUser = userRepository.save(user);
 
-        ParentProfile parent = ParentProfile.builder()
+        ChildProfile child = ChildProfile.builder()
                 .user(savedUser)
-                .fullName(request.fullName())
-                .email(request.email())
+                .displayName(request.displayName())
+                .age(request.age())
                 .build();
 
-        ParentProfile savedParent =
-                parentProfileRepository.save(parent);
+        ChildProfile savedChild =
+                childProfileRepository.save(child);
 
-        return new ParentResponse(
-                savedParent.getId(),
+        return new ChildResponse(
+                savedChild.getId(),
                 savedUser.getId(),
                 savedUser.getUsername(),
-                savedParent.getFullName(),
-                savedParent.getEmail()
+                savedChild.getDisplayName(),
+                savedChild.getAge(),
+                savedChild.getXp(),
+                savedChild.getLevel()
         );
     }
 }

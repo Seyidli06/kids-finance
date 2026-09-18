@@ -1,4 +1,4 @@
-package com.kidsfinance.parent.dto;
+package com.kidsfinance.parent.dto.response;
 
 public record ParentResponse(
         Long id,

@@ -1,10 +1,11 @@
-package com.kidsfinance.parent.dto;
+package com.kidsfinance.child.dto.request;
 
-import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
-public record CreateParentRequest(
+public record CreateChildRequest(
 
         @NotBlank
         @Size(min = 3, max = 50)
@@ -15,12 +16,11 @@ public record CreateParentRequest(
         String password,
 
         @NotBlank
-        @Size(max = 100)
-        String fullName,
+        @Size(max = 50)
+        String displayName,
 
-        @NotBlank
-        @Email
-        @Size(max = 255)
-        String email
+        @Min(10)
+        @Max(14)
+        short age
 ) {
 }

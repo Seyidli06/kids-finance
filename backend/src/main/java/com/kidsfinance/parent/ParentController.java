@@ -1,7 +1,7 @@
 package com.kidsfinance.parent;
 
-import com.kidsfinance.parent.dto.CreateParentRequest;
-import com.kidsfinance.parent.dto.ParentResponse;
+import com.kidsfinance.parent.dto.request.CreateParentRequest;
+import com.kidsfinance.parent.dto.response.ParentResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

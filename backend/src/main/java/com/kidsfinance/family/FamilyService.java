@@ -2,6 +2,8 @@ package com.kidsfinance.family;
 
 import com.kidsfinance.child.ChildProfile;
 import com.kidsfinance.child.ChildProfileRepository;
+import com.kidsfinance.family.dto.request.LinkParentChildRequest;
+import com.kidsfinance.family.dto.response.ParentChildLinkResponse;
 import com.kidsfinance.parent.ParentProfile;
 import com.kidsfinance.parent.ParentProfileRepository;
 import lombok.RequiredArgsConstructor;
@@ -17,33 +19,33 @@ public class FamilyService {
     private final ParentChildLinkRepository parentChildLinkRepository;
 
     @Transactional
-    public ParentChildLink linkParentToChild(
-            Long parentProfileId,
-            Long childProfileId
+    public ParentChildLinkResponse linkParentToChild(
+            LinkParentChildRequest request
     ) {
+
         ParentProfile parent = parentProfileRepository
-                .findById(parentProfileId)
+                .findById(request.parentProfileId())
                 .orElseThrow(() ->
                         new IllegalArgumentException(
                                 "Parent profile not found: "
-                                        + parentProfileId
+                                        + request.parentProfileId()
                         )
                 );
 
         ChildProfile child = childProfileRepository
-                .findById(childProfileId)
+                .findById(request.childProfileId())
                 .orElseThrow(() ->
                         new IllegalArgumentException(
                                 "Child profile not found: "
-                                        + childProfileId
+                                        + request.childProfileId()
                         )
                 );
 
         boolean alreadyLinked =
                 parentChildLinkRepository
                         .existsByParent_IdAndChild_Id(
-                                parentProfileId,
-                                childProfileId
+                                parent.getId(),
+                                child.getId()
                         );
 
         if (alreadyLinked) {
@@ -57,6 +59,14 @@ public class FamilyService {
                 .child(child)
                 .build();
 
-        return parentChildLinkRepository.save(link);
+        ParentChildLink savedLink =
+                parentChildLinkRepository.save(link);
+
+        return new ParentChildLinkResponse(
+                savedLink.getId(),
+                savedLink.getParent().getId(),
+                savedLink.getChild().getId(),
+                savedLink.getCreatedAt()
+        );
     }
 }
