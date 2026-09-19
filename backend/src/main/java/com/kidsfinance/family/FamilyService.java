@@ -2,6 +2,8 @@ package com.kidsfinance.family;
 
 import com.kidsfinance.child.ChildProfile;
 import com.kidsfinance.child.ChildProfileRepository;
+import com.kidsfinance.common.exception.ConflictException;
+import com.kidsfinance.common.exception.ResourceNotFoundException;
 import com.kidsfinance.family.dto.request.LinkParentChildRequest;
 import com.kidsfinance.family.dto.response.ParentChildLinkResponse;
 import com.kidsfinance.parent.ParentProfile;
@@ -26,7 +28,7 @@ public class FamilyService {
         ParentProfile parent = parentProfileRepository
                 .findById(request.parentProfileId())
                 .orElseThrow(() ->
-                        new IllegalArgumentException(
+                        new ResourceNotFoundException(
                                 "Parent profile not found: "
                                         + request.parentProfileId()
                         )
@@ -35,7 +37,7 @@ public class FamilyService {
         ChildProfile child = childProfileRepository
                 .findById(request.childProfileId())
                 .orElseThrow(() ->
-                        new IllegalArgumentException(
+                        new ResourceNotFoundException(
                                 "Child profile not found: "
                                         + request.childProfileId()
                         )
@@ -49,7 +51,7 @@ public class FamilyService {
                         );
 
         if (alreadyLinked) {
-            throw new IllegalStateException(
+            throw new ConflictException(
                     "Parent and child are already linked"
             );
         }

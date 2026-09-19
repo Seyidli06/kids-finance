@@ -1,11 +1,16 @@
 package com.kidsfinance.parent;
 
 import com.kidsfinance.parent.dto.request.CreateParentRequest;
+import com.kidsfinance.parent.dto.response.ParentChildResponse;
 import com.kidsfinance.parent.dto.response.ParentResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/parents")
@@ -20,5 +25,17 @@ public class ParentController {
             @Valid @RequestBody CreateParentRequest request
     ) {
         return parentService.createParent(request);
+    }
+
+    @GetMapping("/me/children")
+    public List<ParentChildResponse> getMyChildren(
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+
+        Long userId = Long.parseLong(
+                jwt.getSubject()
+        );
+
+        return parentService.getMyChildren(userId);
     }
 }

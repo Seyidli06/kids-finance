@@ -2,6 +2,7 @@ package com.kidsfinance.child;
 
 import com.kidsfinance.child.dto.request.CreateChildRequest;
 import com.kidsfinance.child.dto.response.ChildResponse;
+import com.kidsfinance.common.exception.ConflictException;
 import com.kidsfinance.user.User;
 import com.kidsfinance.user.UserRepository;
 import com.kidsfinance.user.UserRole;
@@ -22,7 +23,7 @@ public class ChildService {
     public ChildResponse createChild(CreateChildRequest request) {
 
         if (userRepository.existsByUsername(request.username())) {
-            throw new IllegalStateException(
+            throw new ConflictException(
                     "Username already exists"
             );
         }
