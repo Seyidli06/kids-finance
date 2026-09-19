@@ -3,6 +3,11 @@ package com.kidsfinance.child;
 import com.kidsfinance.child.dto.request.CreateChildRequest;
 import com.kidsfinance.child.dto.response.ChildResponse;
 import com.kidsfinance.common.exception.ConflictException;
+import com.kidsfinance.common.exception.ResourceNotFoundException;
+import com.kidsfinance.family.ParentChildLink;
+import com.kidsfinance.family.ParentChildLinkRepository;
+import com.kidsfinance.parent.ParentProfile;
+import com.kidsfinance.parent.ParentProfileRepository;
 import com.kidsfinance.user.User;
 import com.kidsfinance.user.UserRepository;
 import com.kidsfinance.user.UserRole;
@@ -17,10 +22,23 @@ public class ChildService {
 
     private final UserRepository userRepository;
     private final ChildProfileRepository childProfileRepository;
+    private final ParentProfileRepository parentProfileRepository;
+    private final ParentChildLinkRepository parentChildLinkRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Transactional
-    public ChildResponse createChild(CreateChildRequest request) {
+    public ChildResponse createChildForParent(
+            Long parentUserId,
+            CreateChildRequest request
+    ) {
+
+        ParentProfile parent = parentProfileRepository
+                .findByUser_Id(parentUserId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Parent profile not found for authenticated user"
+                        )
+                );
 
         if (userRepository.existsByUsername(request.username())) {
             throw new ConflictException(
@@ -46,6 +64,13 @@ public class ChildService {
 
         ChildProfile savedChild =
                 childProfileRepository.save(child);
+
+        ParentChildLink link = ParentChildLink.builder()
+                .parent(parent)
+                .child(savedChild)
+                .build();
+
+        parentChildLinkRepository.save(link);
 
         return new ChildResponse(
                 savedChild.getId(),

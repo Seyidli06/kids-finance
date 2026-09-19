@@ -42,7 +42,6 @@ public class SecurityConfig {
                         ).permitAll()
 
                         .requestMatchers(
-                                HttpMethod.GET,
                                 "/api/parents/me/children"
                         ).hasRole("PARENT")
 

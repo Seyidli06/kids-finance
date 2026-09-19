@@ -1,5 +1,8 @@
 package com.kidsfinance.parent;
 
+import com.kidsfinance.child.ChildService;
+import com.kidsfinance.child.dto.request.CreateChildRequest;
+import com.kidsfinance.child.dto.response.ChildResponse;
 import com.kidsfinance.parent.dto.request.CreateParentRequest;
 import com.kidsfinance.parent.dto.response.ParentChildResponse;
 import com.kidsfinance.parent.dto.response.ParentResponse;
@@ -18,6 +21,7 @@ import java.util.List;
 public class ParentController {
 
     private final ParentService parentService;
+    private final ChildService childService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -37,5 +41,22 @@ public class ParentController {
         );
 
         return parentService.getMyChildren(userId);
+    }
+
+    @PostMapping("/me/children")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ChildResponse createMyChild(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody CreateChildRequest request
+    ) {
+
+        Long userId = Long.parseLong(
+                jwt.getSubject()
+        );
+
+        return childService.createChildForParent(
+                userId,
+                request
+        );
     }
 }
