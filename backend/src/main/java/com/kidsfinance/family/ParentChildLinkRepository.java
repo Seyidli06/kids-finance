@@ -12,6 +12,11 @@ public interface ParentChildLinkRepository
             Long childId
     );
 
+    boolean existsByParent_User_IdAndChild_Id(
+            Long parentUserId,
+            Long childProfileId
+    );
+
     List<ParentChildLink> findAllByParent_Id(Long parentId);
 
     List<ParentChildLink> findAllByChild_Id(Long childId);

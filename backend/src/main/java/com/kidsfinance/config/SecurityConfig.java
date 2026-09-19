@@ -30,6 +30,7 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
 
+                        // Public endpoints
                         .requestMatchers(
                                 "/actuator/health",
                                 "/error"
@@ -41,10 +42,30 @@ public class SecurityConfig {
                                 "/api/auth/login"
                         ).permitAll()
 
+                        // Parent: children
                         .requestMatchers(
+                                HttpMethod.GET,
                                 "/api/parents/me/children"
                         ).hasRole("PARENT")
 
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/parents/me/children"
+                        ).hasRole("PARENT")
+
+                        // Parent: child wallet
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/parents/me/children/*/wallet"
+                        ).hasRole("PARENT")
+
+                        // Parent: wallet transaction history
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/parents/me/children/*/wallet/transactions"
+                        ).hasRole("PARENT")
+
+                        // All other endpoints remain blocked
                         .anyRequest().denyAll()
                 )
                 .oauth2ResourceServer(oauth2 ->

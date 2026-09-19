@@ -11,6 +11,7 @@ import com.kidsfinance.parent.ParentProfileRepository;
 import com.kidsfinance.user.User;
 import com.kidsfinance.user.UserRepository;
 import com.kidsfinance.user.UserRole;
+import com.kidsfinance.wallet.WalletService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,7 @@ public class ChildService {
     private final ParentProfileRepository parentProfileRepository;
     private final ParentChildLinkRepository parentChildLinkRepository;
     private final PasswordEncoder passwordEncoder;
+    private final WalletService walletService;
 
     @Transactional
     public ChildResponse createChildForParent(
@@ -71,6 +73,8 @@ public class ChildService {
                 .build();
 
         parentChildLinkRepository.save(link);
+
+        walletService.createInitialWallet(savedChild);
 
         return new ChildResponse(
                 savedChild.getId(),
