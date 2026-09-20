@@ -176,4 +176,26 @@ public class SimulationService {
             );
         }
     }
+
+    @Transactional(readOnly = true)
+    public List<SimulationDecisionResponse> getDecisionsForParent(
+            Long parentUserId,
+            Long childProfileId
+    ) {
+
+        verifyChildBelongsToParent(parentUserId, childProfileId);
+
+        return simulationDecisionRepository
+                .findAllByChild_IdOrderByCreatedAtDescIdDesc(childProfileId)
+                .stream()
+                .map(decision -> new SimulationDecisionResponse(
+                        decision.getId(),
+                        decision.getScenarioCode(),
+                        decision.getOptionCode(),
+                        decision.getAmountSpent(),
+                        decision.getWalletTransactionId(),
+                        decision.getCreatedAt()
+                ))
+                .toList();
+    }
 }

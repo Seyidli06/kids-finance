@@ -51,4 +51,18 @@ public class SimulationController {
                 request
         );
     }
+
+    @GetMapping("/{childId}/simulations/decisions")
+    public List<SimulationDecisionResponse> getDecisions(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long childId
+    ) {
+
+        Long parentUserId = Long.parseLong(jwt.getSubject());
+
+        return simulationService.getDecisionsForParent(
+                parentUserId,
+                childId
+        );
+    }
 }

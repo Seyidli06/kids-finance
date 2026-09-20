@@ -88,6 +88,11 @@ public class SecurityConfig {
                                 "/api/parents/me/children/*/simulations/*/decisions"
                         ).hasRole("PARENT")
 
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/parents/me/children/*/simulations/decisions"
+                        ).hasRole("PARENT")
+
                         // Everything else remains blocked
                         .anyRequest().denyAll()
                 )
