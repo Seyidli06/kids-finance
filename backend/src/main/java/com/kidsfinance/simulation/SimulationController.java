@@ -1,7 +1,11 @@
 package com.kidsfinance.simulation;
 
+import com.kidsfinance.simulation.dto.request.SimulationDecisionRequest;
+import com.kidsfinance.simulation.dto.response.SimulationDecisionResponse;
 import com.kidsfinance.simulation.dto.response.SimulationScenarioResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -26,6 +30,25 @@ public class SimulationController {
         return simulationService.getScenariosForParent(
                 parentUserId,
                 childId
+        );
+    }
+
+    @PostMapping("/{childId}/simulations/{scenarioCode}/decisions")
+    @ResponseStatus(HttpStatus.CREATED)
+    public SimulationDecisionResponse makeDecision(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long childId,
+            @PathVariable String scenarioCode,
+            @Valid @RequestBody SimulationDecisionRequest request
+    ) {
+
+        Long parentUserId = Long.parseLong(jwt.getSubject());
+
+        return simulationService.makeDecision(
+                parentUserId,
+                childId,
+                scenarioCode,
+                request
         );
     }
 }
