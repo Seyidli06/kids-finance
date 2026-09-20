@@ -69,6 +69,12 @@ public class SimulationDecision {
     private Long walletTransactionId;
 
     @Column(
+            name = "xp_earned",
+            nullable = false
+    )
+    private Integer xpEarned;
+
+    @Column(
             name = "created_at",
             nullable = false,
             updatable = false

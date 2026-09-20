@@ -9,6 +9,7 @@ public record SimulationDecisionResponse(
         String optionCode,
         BigDecimal amountSpent,
         Long walletTransactionId,
+        Integer xpEarned,
         OffsetDateTime createdAt
 ) {
 }
