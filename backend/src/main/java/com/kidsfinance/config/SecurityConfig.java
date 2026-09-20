@@ -77,7 +77,13 @@ public class SecurityConfig {
                                 "/api/parents/me/children/*/wallet/debit"
                         ).hasRole("PARENT")
 
-                        // Everything else is blocked
+                        // Parent: view child simulation scenarios
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/parents/me/children/*/simulations"
+                        ).hasRole("PARENT")
+
+                        // Everything else remains blocked
                         .anyRequest().denyAll()
                 )
                 .oauth2ResourceServer(oauth2 ->
