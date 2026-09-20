@@ -53,7 +53,7 @@ public class SecurityConfig {
                                 "/api/parents/me/children"
                         ).hasRole("PARENT")
 
-                        // Parent: child wallet
+                        // Parent: child wallet balance
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/parents/me/children/*/wallet"
@@ -65,7 +65,19 @@ public class SecurityConfig {
                                 "/api/parents/me/children/*/wallet/transactions"
                         ).hasRole("PARENT")
 
-                        // All other endpoints remain blocked
+                        // Parent: add virtual money
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/parents/me/children/*/wallet/credit"
+                        ).hasRole("PARENT")
+
+                        // Parent: spend virtual money
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/parents/me/children/*/wallet/debit"
+                        ).hasRole("PARENT")
+
+                        // Everything else is blocked
                         .anyRequest().denyAll()
                 )
                 .oauth2ResourceServer(oauth2 ->

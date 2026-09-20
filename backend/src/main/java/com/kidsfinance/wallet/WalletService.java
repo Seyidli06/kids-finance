@@ -61,7 +61,10 @@ public class WalletService {
             Long childProfileId
     ) {
 
-        verifyChildBelongsToParent(parentUserId, childProfileId);
+        verifyChildBelongsToParent(
+                parentUserId,
+                childProfileId
+        );
 
         Wallet wallet = walletRepository
                 .findByChild_Id(childProfileId)
@@ -72,12 +75,7 @@ public class WalletService {
                         )
                 );
 
-        return new WalletResponse(
-                wallet.getId(),
-                wallet.getChild().getId(),
-                wallet.getBalance(),
-                wallet.getCurrency()
-        );
+        return toWalletResponse(wallet);
     }
 
     @Transactional(readOnly = true)
@@ -86,7 +84,10 @@ public class WalletService {
             Long childProfileId
     ) {
 
-        verifyChildBelongsToParent(parentUserId, childProfileId);
+        verifyChildBelongsToParent(
+                parentUserId,
+                childProfileId
+        );
 
         Wallet wallet = walletRepository
                 .findByChild_Id(childProfileId)
@@ -98,17 +99,100 @@ public class WalletService {
                 );
 
         return walletTransactionRepository
-                .findAllByWallet_IdOrderByCreatedAtDescIdDesc(wallet.getId())
+                .findAllByWallet_IdOrderByCreatedAtDescIdDesc(
+                        wallet.getId()
+                )
                 .stream()
-                .map(transaction -> new WalletTransactionResponse(
-                        transaction.getId(),
-                        transaction.getType(),
-                        transaction.getAmount(),
-                        transaction.getBalanceAfter(),
-                        transaction.getDescription(),
-                        transaction.getCreatedAt()
-                ))
+                .map(this::toTransactionResponse)
                 .toList();
+    }
+
+    @Transactional
+    public WalletTransactionResponse credit(
+            Long parentUserId,
+            Long childProfileId,
+            BigDecimal amount,
+            String description
+    ) {
+
+        verifyChildBelongsToParent(
+                parentUserId,
+                childProfileId
+        );
+
+        Wallet wallet = getWalletForUpdate(childProfileId);
+
+        BigDecimal newBalance =
+                wallet.getBalance().add(amount);
+
+        wallet.setBalance(newBalance);
+
+        WalletTransaction transaction =
+                WalletTransaction.builder()
+                        .wallet(wallet)
+                        .type(WalletTransactionType.CREDIT)
+                        .amount(amount)
+                        .balanceAfter(newBalance)
+                        .description(description)
+                        .build();
+
+        WalletTransaction savedTransaction =
+                walletTransactionRepository.save(transaction);
+
+        return toTransactionResponse(savedTransaction);
+    }
+
+    @Transactional
+    public WalletTransactionResponse debit(
+            Long parentUserId,
+            Long childProfileId,
+            BigDecimal amount,
+            String description
+    ) {
+
+        verifyChildBelongsToParent(
+                parentUserId,
+                childProfileId
+        );
+
+        Wallet wallet = getWalletForUpdate(childProfileId);
+
+        if (wallet.getBalance().compareTo(amount) < 0) {
+            throw new ConflictException(
+                    "Insufficient wallet balance"
+            );
+        }
+
+        BigDecimal newBalance =
+                wallet.getBalance().subtract(amount);
+
+        wallet.setBalance(newBalance);
+
+        WalletTransaction transaction =
+                WalletTransaction.builder()
+                        .wallet(wallet)
+                        .type(WalletTransactionType.DEBIT)
+                        .amount(amount)
+                        .balanceAfter(newBalance)
+                        .description(description)
+                        .build();
+
+        WalletTransaction savedTransaction =
+                walletTransactionRepository.save(transaction);
+
+        return toTransactionResponse(savedTransaction);
+    }
+
+    private Wallet getWalletForUpdate(Long childProfileId) {
+
+        return walletRepository
+                .findByChildIdForUpdate(childProfileId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Wallet not found for child: "
+                                        + childProfileId
+                        )
+                );
     }
 
     private void verifyChildBelongsToParent(
@@ -116,16 +200,41 @@ public class WalletService {
             Long childProfileId
     ) {
 
-        boolean belongsToParent = parentChildLinkRepository
-                .existsByParent_User_IdAndChild_Id(
-                        parentUserId,
-                        childProfileId
-                );
+        boolean belongsToParent =
+                parentChildLinkRepository
+                        .existsByParent_User_IdAndChild_Id(
+                                parentUserId,
+                                childProfileId
+                        );
 
         if (!belongsToParent) {
             throw new ResourceNotFoundException(
                     "Child not found for authenticated parent"
             );
         }
+    }
+
+    private WalletResponse toWalletResponse(Wallet wallet) {
+
+        return new WalletResponse(
+                wallet.getId(),
+                wallet.getChild().getId(),
+                wallet.getBalance(),
+                wallet.getCurrency()
+        );
+    }
+
+    private WalletTransactionResponse toTransactionResponse(
+            WalletTransaction transaction
+    ) {
+
+        return new WalletTransactionResponse(
+                transaction.getId(),
+                transaction.getType(),
+                transaction.getAmount(),
+                transaction.getBalanceAfter(),
+                transaction.getDescription(),
+                transaction.getCreatedAt()
+        );
     }
 }
