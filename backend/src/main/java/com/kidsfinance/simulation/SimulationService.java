@@ -13,10 +13,8 @@ import com.kidsfinance.simulation.dto.response.SimulationScenarioResponse;
 import com.kidsfinance.wallet.WalletService;
 import com.kidsfinance.wallet.dto.response.WalletTransactionResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -25,58 +23,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SimulationService {
 
-    private static final String SAVE_OR_SPEND =
-            "SAVE_OR_SPEND_01";
-
-    private static final String PLAN_PURCHASE =
-            "PLAN_PURCHASE_02";
-
-    private static final List<SimulationScenarioResponse> SCENARIOS =
-            List.of(
-                    new SimulationScenarioResponse(
-                            SAVE_OR_SPEND,
-                            "İndi alım, yoxsa pulumu saxlayım?",
-                            "150 AZN-lik qulaqlıq görmüsən. "
-                                    + "Onu indi almaq və ya pulunu saxlamaq arasında seçim et.",
-                            List.of(
-                                    new SimulationOptionResponse(
-                                            "BUY_HEADPHONES",
-                                            "Qulaqlığı al",
-                                            "İndi 150 AZN xərcləyərək qulaqlığı alırsan.",
-                                            new BigDecimal("150.00")
-                                    ),
-                                    new SimulationOptionResponse(
-                                            "KEEP_SAVINGS",
-                                            "Pulunu saxla",
-                                            "Qulaqlığı indi almırsan və pulunu "
-                                                    + "gələcək məqsədin üçün saxlayırsan.",
-                                            new BigDecimal("0.00")
-                                    )
-                            )
-                    ),
-
-                    new SimulationScenarioResponse(
-                            PLAN_PURCHASE,
-                            "Bu gün hansını alım?",
-                            "Məktəb çantan köhnəlib. Yeni çanta 80 AZN, "
-                                    + "bəyəndiyin oyun aksesuarı isə 120 AZN-dir. "
-                                    + "Bu gün yalnız birini almağı seçirsən.",
-                            List.of(
-                                    new SimulationOptionResponse(
-                                            "BUY_SCHOOL_BAG",
-                                            "Məktəb çantasını al",
-                                            "80 AZN xərcləyərək yeni məktəb çantası alırsan.",
-                                            new BigDecimal("80.00")
-                                    ),
-                                    new SimulationOptionResponse(
-                                            "BUY_GAME_ACCESSORY",
-                                            "Oyun aksesuarını al",
-                                            "120 AZN xərcləyərək oyun aksesuarı alırsan.",
-                                            new BigDecimal("120.00")
-                                    )
-                            )
-                    )
-            );
+    private final SimulationScenarioRepository simulationScenarioRepository;
+    private final SimulationOptionRepository simulationOptionRepository;
 
     private final ParentChildLinkRepository parentChildLinkRepository;
     private final ChildProfileRepository childProfileRepository;
@@ -90,9 +38,16 @@ public class SimulationService {
             Long childProfileId
     ) {
 
-        verifyChildBelongsToParent(parentUserId, childProfileId);
+        verifyChildBelongsToParent(
+                parentUserId,
+                childProfileId
+        );
 
-        return SCENARIOS;
+        return simulationScenarioRepository
+                .findAllByActiveTrueOrderByDisplayOrderAsc()
+                .stream()
+                .map(this::toScenarioResponse)
+                .toList();
     }
 
     @Transactional
@@ -103,44 +58,46 @@ public class SimulationService {
             SimulationDecisionRequest request
     ) {
 
-        verifyChildBelongsToParent(parentUserId, childProfileId);
-
-        // Ssenarini yalnız backend-də müəyyən edilmiş siyahıdan tapırıq.
-        SimulationScenarioResponse scenario = SCENARIOS
-                .stream()
-                .filter(item -> item.code().equals(scenarioCode))
-                .findFirst()
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Simulation scenario not found: " + scenarioCode
-                        )
-                );
-
-        // Seçim mütləq həmin ssenariyə aid olmalıdır.
-        SimulationOptionResponse selectedOption = scenario.options()
-                .stream()
-                .filter(option -> option.code().equals(request.optionCode()))
-                .findFirst()
-                .orElseThrow(() ->
-                        new ResponseStatusException(
-                                HttpStatus.BAD_REQUEST,
-                                "Invalid simulation option"
-                        )
-                );
+        verifyChildBelongsToParent(
+                parentUserId,
+                childProfileId
+        );
 
         ChildProfile child = childProfileRepository
-                .findByIdForUpdate(childProfileId)
+                .findById(childProfileId)
                 .orElseThrow(() ->
                         new ResourceNotFoundException(
                                 "Child not found for authenticated parent"
                         )
                 );
 
-        boolean alreadyDecided = simulationDecisionRepository
-                .existsByChild_IdAndScenarioCode(
-                        childProfileId,
-                        scenarioCode
-                );
+        SimulationScenario scenario =
+                simulationScenarioRepository
+                        .findByCodeAndActiveTrue(scenarioCode)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Simulation scenario not found"
+                                )
+                        );
+
+        SimulationOption selectedOption =
+                simulationOptionRepository
+                        .findByScenario_IdAndCodeAndActiveTrue(
+                                scenario.getId(),
+                                request.optionCode()
+                        )
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Simulation option not found"
+                                )
+                        );
+
+        boolean alreadyDecided =
+                simulationDecisionRepository
+                        .existsByChild_IdAndScenarioCode(
+                                childProfileId,
+                                scenario.getCode()
+                        );
 
         if (alreadyDecided) {
             throw new ConflictException(
@@ -148,11 +105,10 @@ public class SimulationService {
             );
         }
 
-        // Məbləği request-dən deyil, backend-dəki seçimdən götürürük.
-        BigDecimal amountSpent = selectedOption.cost();
+        BigDecimal amountSpent = selectedOption.getCost();
+
         Long walletTransactionId = null;
 
-        // Yalnız müsbət məbləğli seçim wallet-dən pul çıxır.
         if (amountSpent.signum() > 0) {
 
             WalletTransactionResponse walletTransaction =
@@ -160,27 +116,43 @@ public class SimulationService {
                             parentUserId,
                             childProfileId,
                             amountSpent,
-                            "Simulation " + scenarioCode
-                                    + ": " + selectedOption.code()
+                            "Simulation "
+                                    + scenario.getCode()
+                                    + ": "
+                                    + selectedOption.getCode()
                     );
 
-            walletTransactionId = walletTransaction.id();
+            walletTransactionId =
+                    walletTransaction.id();
         }
 
         int xpEarned =
-                scoringService.awardScenarioCompletionXp(child);
+                scoringService
+                        .awardScenarioCompletionXp(child);
 
-        SimulationDecision decision = SimulationDecision.builder()
-                .child(child)
-                .scenarioCode(scenarioCode)
-                .optionCode(selectedOption.code())
-                .amountSpent(amountSpent)
-                .walletTransactionId(walletTransactionId)
-                .xpEarned(xpEarned)
-                .build();
+        SimulationDecision decision =
+                SimulationDecision.builder()
+                        .child(child)
+                        .scenarioCode(
+                                scenario.getCode()
+                        )
+                        .optionCode(
+                                selectedOption.getCode()
+                        )
+                        .amountSpent(
+                                amountSpent
+                        )
+                        .walletTransactionId(
+                                walletTransactionId
+                        )
+                        .xpEarned(
+                                xpEarned
+                        )
+                        .build();
 
         SimulationDecision savedDecision =
-                simulationDecisionRepository.save(decision);
+                simulationDecisionRepository
+                        .save(decision);
 
         return new SimulationDecisionResponse(
                 savedDecision.getId(),
@@ -199,21 +171,56 @@ public class SimulationService {
             Long childProfileId
     ) {
 
-        verifyChildBelongsToParent(parentUserId, childProfileId);
+        verifyChildBelongsToParent(
+                parentUserId,
+                childProfileId
+        );
 
         return simulationDecisionRepository
-                .findAllByChild_IdOrderByCreatedAtDescIdDesc(childProfileId)
+                .findAllByChild_IdOrderByCreatedAtDescIdDesc(
+                        childProfileId
+                )
                 .stream()
-                .map(decision -> new SimulationDecisionResponse(
-                        decision.getId(),
-                        decision.getScenarioCode(),
-                        decision.getOptionCode(),
-                        decision.getAmountSpent(),
-                        decision.getWalletTransactionId(),
-                        decision.getXpEarned(),
-                        decision.getCreatedAt()
-                ))
+                .map(decision ->
+                        new SimulationDecisionResponse(
+                                decision.getId(),
+                                decision.getScenarioCode(),
+                                decision.getOptionCode(),
+                                decision.getAmountSpent(),
+                                decision.getWalletTransactionId(),
+                                decision.getXpEarned(),
+                                decision.getCreatedAt()
+                        )
+                )
                 .toList();
+    }
+
+    private SimulationScenarioResponse toScenarioResponse(
+            SimulationScenario scenario
+    ) {
+
+        List<SimulationOptionResponse> options =
+                simulationOptionRepository
+                        .findAllByScenario_IdAndActiveTrueOrderByDisplayOrderAsc(
+                                scenario.getId()
+                        )
+                        .stream()
+                        .map(option ->
+                                new SimulationOptionResponse(
+                                        option.getCode(),
+                                        option.getTitle(),
+                                        option.getDescription(),
+                                        option.getCost()
+                                )
+                        )
+                        .toList();
+
+        return new SimulationScenarioResponse(
+                scenario.getCode(),
+                scenario.getTitle(),
+                scenario.getDescription(),
+                options
+        );
     }
 
     private void verifyChildBelongsToParent(
@@ -221,11 +228,12 @@ public class SimulationService {
             Long childProfileId
     ) {
 
-        boolean belongsToParent = parentChildLinkRepository
-                .existsByParent_User_IdAndChild_Id(
-                        parentUserId,
-                        childProfileId
-                );
+        boolean belongsToParent =
+                parentChildLinkRepository
+                        .existsByParent_User_IdAndChild_Id(
+                                parentUserId,
+                                childProfileId
+                        );
 
         if (!belongsToParent) {
             throw new ResourceNotFoundException(
