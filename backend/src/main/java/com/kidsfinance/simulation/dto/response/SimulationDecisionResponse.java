@@ -5,6 +5,7 @@ import java.time.OffsetDateTime;
 
 public record SimulationDecisionResponse(
         Long id,
+        Long runId,
         String scenarioCode,
         String optionCode,
         BigDecimal amountSpent,

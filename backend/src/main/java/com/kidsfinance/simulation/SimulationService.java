@@ -18,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
 
+import com.kidsfinance.simulation.dto.response.SimulationRunResponse;
+
 @Service
 @RequiredArgsConstructor
 public class SimulationService {
@@ -160,6 +162,7 @@ public class SimulationService {
 
         return new SimulationDecisionResponse(
                 savedDecision.getId(),
+                savedDecision.getRun().getId(),
                 savedDecision.getScenarioCode(),
                 savedDecision.getOptionCode(),
                 savedDecision.getAmountSpent(),
@@ -188,6 +191,7 @@ public class SimulationService {
                 .map(decision ->
                         new SimulationDecisionResponse(
                                 decision.getId(),
+                                decision.getRun().getId(),
                                 decision.getScenarioCode(),
                                 decision.getOptionCode(),
                                 decision.getAmountSpent(),
@@ -244,5 +248,33 @@ public class SimulationService {
                     "Child not found for authenticated parent"
             );
         }
+    }
+
+    @Transactional(readOnly = true)
+    public List<SimulationRunResponse> getRunsForParent(
+            Long parentUserId,
+            Long childProfileId
+    ) {
+
+        verifyChildBelongsToParent(
+                parentUserId,
+                childProfileId
+        );
+
+        return simulationRunRepository
+                .findAllByChild_IdOrderByStartedAtDescIdDesc(
+                        childProfileId
+                )
+                .stream()
+                .map(run ->
+                        new SimulationRunResponse(
+                                run.getId(),
+                                run.getScenario().getCode(),
+                                run.getStatus(),
+                                run.getStartedAt(),
+                                run.getCompletedAt()
+                        )
+                )
+                .toList();
     }
 }

@@ -5,6 +5,7 @@ import com.kidsfinance.child.ChildProfileRepository;
 import com.kidsfinance.child.ChildService;
 import com.kidsfinance.child.dto.request.CreateChildRequest;
 import com.kidsfinance.child.dto.response.ChildResponse;
+import com.kidsfinance.common.exception.ResourceNotFoundException;
 import com.kidsfinance.learning.LearningTopicRepository;
 import com.kidsfinance.parent.ParentService;
 import com.kidsfinance.parent.dto.request.CreateParentRequest;
@@ -22,13 +23,10 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
-import com.kidsfinance.common.exception.ResourceNotFoundException;
-
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 @Testcontainers
@@ -51,6 +49,9 @@ class SimulationServiceIntegrationTest {
 
     @Autowired
     private SimulationDecisionRepository simulationDecisionRepository;
+
+    @Autowired
+    private SimulationRunRepository simulationRunRepository;
 
     @Autowired
     private ParentService parentService;
@@ -83,7 +84,6 @@ class SimulationServiceIntegrationTest {
     @Test
     void shouldProcessSimulationDecisionAndUpdateWalletAndXp() {
 
-        // 1. Create parent
         ParentResponse parent =
                 parentService.createParent(
                         new CreateParentRequest(
@@ -94,7 +94,6 @@ class SimulationServiceIntegrationTest {
                         )
                 );
 
-        // 2. Create child
         ChildResponse child =
                 childService.createChildForParent(
                         parent.userId(),
@@ -106,7 +105,6 @@ class SimulationServiceIntegrationTest {
                         )
                 );
 
-        // 3. Initial wallet = 1000 AZN
         Wallet walletBefore =
                 walletRepository
                         .findByChild_Id(child.id())
@@ -117,7 +115,6 @@ class SimulationServiceIntegrationTest {
                         new BigDecimal("1000.00")
                 );
 
-        // 4. Execute simulation decision
         SimulationDecisionResponse decision =
                 simulationService.makeDecision(
                         parent.userId(),
@@ -128,12 +125,21 @@ class SimulationServiceIntegrationTest {
                         )
                 );
 
-        // 5. Verify decision data
+        assertThat(decision.id())
+                .isNotNull();
+
+        assertThat(decision.runId())
+                .isNotNull();
+
         assertThat(decision.scenarioCode())
-                .isEqualTo("SAVE_OR_SPEND_01");
+                .isEqualTo(
+                        "SAVE_OR_SPEND_01"
+                );
 
         assertThat(decision.optionCode())
-                .isEqualTo("BUY_HEADPHONES");
+                .isEqualTo(
+                        "BUY_HEADPHONES"
+                );
 
         assertThat(decision.amountSpent())
                 .isEqualByComparingTo(
@@ -146,7 +152,39 @@ class SimulationServiceIntegrationTest {
         assertThat(decision.walletTransactionId())
                 .isNotNull();
 
-        // 6. Wallet = 1000 - 150 = 850
+        SimulationRun run =
+                simulationRunRepository
+                        .findById(decision.runId())
+                        .orElseThrow();
+
+        assertThat(run.getStatus())
+                .isEqualTo(
+                        SimulationRunStatus.COMPLETED
+                );
+
+        assertThat(run.getCompletedAt())
+                .isNotNull();
+
+        var runHistory =
+                simulationService.getRunsForParent(
+                        parent.userId(),
+                        child.id()
+                );
+
+        assertThat(runHistory)
+                .hasSize(1);
+
+        assertThat(runHistory.getFirst().id())
+                .isEqualTo(decision.runId());
+
+        assertThat(runHistory.getFirst().scenarioCode())
+                .isEqualTo("SAVE_OR_SPEND_01");
+
+        assertThat(runHistory.getFirst().status())
+                .isEqualTo(
+                        SimulationRunStatus.COMPLETED
+                );
+
         Wallet walletAfter =
                 walletRepository
                         .findByChild_Id(child.id())
@@ -157,7 +195,6 @@ class SimulationServiceIntegrationTest {
                         new BigDecimal("850.00")
                 );
 
-        // 7. Child receives XP
         ChildProfile childAfter =
                 childProfileRepository
                         .findById(child.id())
@@ -169,7 +206,6 @@ class SimulationServiceIntegrationTest {
         assertThat(childAfter.getLevel())
                 .isEqualTo(1);
 
-        // 8. Decision really exists
         assertThat(
                 simulationDecisionRepository
                         .existsByChild_IdAndScenarioCode(
@@ -182,7 +218,6 @@ class SimulationServiceIntegrationTest {
     @Test
     void shouldRejectDecisionWhenChildDoesNotBelongToParent() {
 
-        // Parent A
         ParentResponse parentA =
                 parentService.createParent(
                         new CreateParentRequest(
@@ -193,7 +228,6 @@ class SimulationServiceIntegrationTest {
                         )
                 );
 
-        // Parent B
         ParentResponse parentB =
                 parentService.createParent(
                         new CreateParentRequest(
@@ -204,7 +238,6 @@ class SimulationServiceIntegrationTest {
                         )
                 );
 
-        // Child belongs only to Parent B
         ChildResponse childOfParentB =
                 childService.createChildForParent(
                         parentB.userId(),
@@ -216,10 +249,11 @@ class SimulationServiceIntegrationTest {
                         )
                 );
 
-        // Wallet before attack attempt
         Wallet walletBefore =
                 walletRepository
-                        .findByChild_Id(childOfParentB.id())
+                        .findByChild_Id(
+                                childOfParentB.id()
+                        )
                         .orElseThrow();
 
         assertThat(walletBefore.getBalance())
@@ -227,8 +261,6 @@ class SimulationServiceIntegrationTest {
                         new BigDecimal("1000.00")
                 );
 
-        // Parent A must NOT be able to make a decision
-        // for Parent B's child.
         assertThatThrownBy(() ->
                 simulationService.makeDecision(
                         parentA.userId(),
@@ -239,15 +271,18 @@ class SimulationServiceIntegrationTest {
                         )
                 )
         )
-                .isInstanceOf(ResourceNotFoundException.class)
+                .isInstanceOf(
+                        ResourceNotFoundException.class
+                )
                 .hasMessage(
                         "Child not found for authenticated parent"
                 );
 
-        // Wallet must remain unchanged
         Wallet walletAfter =
                 walletRepository
-                        .findByChild_Id(childOfParentB.id())
+                        .findByChild_Id(
+                                childOfParentB.id()
+                        )
                         .orElseThrow();
 
         assertThat(walletAfter.getBalance())
@@ -255,7 +290,6 @@ class SimulationServiceIntegrationTest {
                         new BigDecimal("1000.00")
                 );
 
-        // No decision should be persisted
         assertThat(
                 simulationDecisionRepository
                         .existsByChild_IdAndScenarioCode(
@@ -264,10 +298,11 @@ class SimulationServiceIntegrationTest {
                         )
         ).isFalse();
 
-        // No XP should be awarded
         ChildProfile childAfter =
                 childProfileRepository
-                        .findById(childOfParentB.id())
+                        .findById(
+                                childOfParentB.id()
+                        )
                         .orElseThrow();
 
         assertThat(childAfter.getXp())
@@ -308,8 +343,12 @@ class SimulationServiceIntegrationTest {
                         )
                 )
         )
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Simulation scenario not found");
+                .isInstanceOf(
+                        ResourceNotFoundException.class
+                )
+                .hasMessage(
+                        "Simulation scenario not found"
+                );
 
         Wallet wallet =
                 walletRepository
@@ -354,11 +393,6 @@ class SimulationServiceIntegrationTest {
                         )
                 );
 
-        /*
-         * BUY_SCHOOL_BAG exists,
-         * but belongs to PLAN_PURCHASE_02,
-         * not SAVE_OR_SPEND_01.
-         */
         assertThatThrownBy(() ->
                 simulationService.makeDecision(
                         parent.userId(),
@@ -369,8 +403,12 @@ class SimulationServiceIntegrationTest {
                         )
                 )
         )
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Simulation option not found");
+                .isInstanceOf(
+                        ResourceNotFoundException.class
+                )
+                .hasMessage(
+                        "Simulation option not found"
+                );
 
         Wallet wallet =
                 walletRepository
@@ -423,23 +461,36 @@ class SimulationServiceIntegrationTest {
                         )
                 );
 
-        simulationService.makeDecision(
-                parent.userId(),
-                child.id(),
-                "SAVE_OR_SPEND_01",
-                new SimulationDecisionRequest(
-                        "BUY_HEADPHONES"
-                )
-        );
+        SimulationDecisionResponse firstDecision =
+                simulationService.makeDecision(
+                        parent.userId(),
+                        child.id(),
+                        "SAVE_OR_SPEND_01",
+                        new SimulationDecisionRequest(
+                                "BUY_HEADPHONES"
+                        )
+                );
 
-        simulationService.makeDecision(
-                parent.userId(),
-                child.id(),
-                "SAVE_OR_SPEND_01",
-                new SimulationDecisionRequest(
-                        "KEEP_SAVINGS"
-                )
-        );
+        SimulationDecisionResponse secondDecision =
+                simulationService.makeDecision(
+                        parent.userId(),
+                        child.id(),
+                        "SAVE_OR_SPEND_01",
+                        new SimulationDecisionRequest(
+                                "KEEP_SAVINGS"
+                        )
+                );
+
+        assertThat(firstDecision.runId())
+                .isNotNull();
+
+        assertThat(secondDecision.runId())
+                .isNotNull();
+
+        assertThat(secondDecision.runId())
+                .isNotEqualTo(
+                        firstDecision.runId()
+                );
 
         assertThat(
                 simulationDecisionRepository
@@ -447,6 +498,44 @@ class SimulationServiceIntegrationTest {
                                 child.id()
                         )
         ).hasSize(2);
+
+        var runs =
+                simulationRunRepository
+                        .findAllByChild_IdOrderByStartedAtDescIdDesc(
+                                child.id()
+                        );
+
+        assertThat(runs)
+                .hasSize(2);
+
+        assertThat(runs)
+                .allMatch(
+                        run ->
+                                run.getStatus()
+                                        == SimulationRunStatus.COMPLETED
+                );
+
+        assertThat(runs)
+                .allMatch(
+                        run ->
+                                run.getCompletedAt() != null
+                );
+
+        var runHistory =
+                simulationService.getRunsForParent(
+                        parent.userId(),
+                        child.id()
+                );
+
+        assertThat(runHistory)
+                .hasSize(2);
+
+        assertThat(runHistory)
+                .allMatch(
+                        run ->
+                                run.status()
+                                        == SimulationRunStatus.COMPLETED
+                );
 
         Wallet wallet =
                 walletRepository
@@ -465,5 +554,8 @@ class SimulationServiceIntegrationTest {
 
         assertThat(childAfter.getXp())
                 .isEqualTo(20);
+
+        assertThat(childAfter.getLevel())
+                .isEqualTo(1);
     }
 }

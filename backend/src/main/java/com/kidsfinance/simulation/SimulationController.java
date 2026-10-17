@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+import com.kidsfinance.simulation.dto.response.SimulationRunResponse;
 
 import java.util.List;
 
@@ -61,6 +62,21 @@ public class SimulationController {
         Long parentUserId = Long.parseLong(jwt.getSubject());
 
         return simulationService.getDecisionsForParent(
+                parentUserId,
+                childId
+        );
+    }
+
+    @GetMapping("/{childId}/simulations/runs")
+    public List<SimulationRunResponse> getRuns(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long childId
+    ) {
+
+        Long parentUserId =
+                Long.parseLong(jwt.getSubject());
+
+        return simulationService.getRunsForParent(
                 parentUserId,
                 childId
         );
