@@ -2,7 +2,6 @@ package com.kidsfinance.simulation;
 
 import com.kidsfinance.child.ChildProfile;
 import com.kidsfinance.child.ChildProfileRepository;
-import com.kidsfinance.common.exception.ConflictException;
 import com.kidsfinance.common.exception.ResourceNotFoundException;
 import com.kidsfinance.family.ParentChildLinkRepository;
 import com.kidsfinance.scoring.ScoringService;
@@ -31,6 +30,8 @@ public class SimulationService {
     private final SimulationDecisionRepository simulationDecisionRepository;
     private final WalletService walletService;
     private final ScoringService scoringService;
+
+    private final SimulationRunRepository simulationRunRepository;
 
     @Transactional(readOnly = true)
     public List<SimulationScenarioResponse> getScenariosForParent(
@@ -92,18 +93,17 @@ public class SimulationService {
                                 )
                         );
 
-        boolean alreadyDecided =
-                simulationDecisionRepository
-                        .existsByChild_IdAndScenarioCode(
-                                childProfileId,
-                                scenario.getCode()
-                        );
+        SimulationRun run =
+                simulationRunRepository.save(
+                        SimulationRun.builder()
+                                .child(child)
+                                .scenario(scenario)
+                                .status(
+                                        SimulationRunStatus.IN_PROGRESS
+                                )
+                                .build()
+                );
 
-        if (alreadyDecided) {
-            throw new ConflictException(
-                    "Child has already completed this scenario"
-            );
-        }
 
         BigDecimal amountSpent = selectedOption.getCost();
 
@@ -133,6 +133,8 @@ public class SimulationService {
         SimulationDecision decision =
                 SimulationDecision.builder()
                         .child(child)
+                        .run(run)
+                        .option(selectedOption)
                         .scenarioCode(
                                 scenario.getCode()
                         )
@@ -153,6 +155,8 @@ public class SimulationService {
         SimulationDecision savedDecision =
                 simulationDecisionRepository
                         .save(decision);
+
+        run.complete();
 
         return new SimulationDecisionResponse(
                 savedDecision.getId(),

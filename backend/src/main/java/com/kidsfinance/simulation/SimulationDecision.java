@@ -8,18 +8,7 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
 @Entity
-@Table(
-        name = "simulation_decisions",
-        uniqueConstraints = {
-                @UniqueConstraint(
-                        name = "uk_simulation_decisions_child_scenario",
-                        columnNames = {
-                                "child_profile_id",
-                                "scenario_code"
-                        }
-                )
-        }
-)
+@Table(name = "simulation_decisions")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
@@ -39,6 +28,27 @@ public class SimulationDecision {
             )
     )
     private ChildProfile child;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(
+            name = "run_id",
+            nullable = false,
+            foreignKey = @ForeignKey(
+                    name = "fk_simulation_decisions_run"
+            )
+    )
+    private SimulationRun run;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(
+            name = "option_id",
+            nullable = false,
+            foreignKey = @ForeignKey(
+                    name = "fk_simulation_decisions_option"
+            )
+    )
+    private SimulationOption option;
+
 
     @Column(
             name = "scenario_code",

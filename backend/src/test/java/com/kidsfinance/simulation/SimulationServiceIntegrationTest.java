@@ -398,4 +398,72 @@ class SimulationServiceIntegrationTest {
                         )
         ).isFalse();
     }
+
+    @Test
+    void shouldAllowChildToReplaySameScenario() {
+
+        ParentResponse parent =
+                parentService.createParent(
+                        new CreateParentRequest(
+                                "replay_parent",
+                                "Password123!",
+                                "Replay Parent",
+                                "replay.parent@example.com"
+                        )
+                );
+
+        ChildResponse child =
+                childService.createChildForParent(
+                        parent.userId(),
+                        new CreateChildRequest(
+                                "replay_child",
+                                "Password123!",
+                                "Replay Child",
+                                (short) 12
+                        )
+                );
+
+        simulationService.makeDecision(
+                parent.userId(),
+                child.id(),
+                "SAVE_OR_SPEND_01",
+                new SimulationDecisionRequest(
+                        "BUY_HEADPHONES"
+                )
+        );
+
+        simulationService.makeDecision(
+                parent.userId(),
+                child.id(),
+                "SAVE_OR_SPEND_01",
+                new SimulationDecisionRequest(
+                        "KEEP_SAVINGS"
+                )
+        );
+
+        assertThat(
+                simulationDecisionRepository
+                        .findAllByChild_IdOrderByCreatedAtDescIdDesc(
+                                child.id()
+                        )
+        ).hasSize(2);
+
+        Wallet wallet =
+                walletRepository
+                        .findByChild_Id(child.id())
+                        .orElseThrow();
+
+        assertThat(wallet.getBalance())
+                .isEqualByComparingTo(
+                        new BigDecimal("850.00")
+                );
+
+        ChildProfile childAfter =
+                childProfileRepository
+                        .findById(child.id())
+                        .orElseThrow();
+
+        assertThat(childAfter.getXp())
+                .isEqualTo(20);
+    }
 }
