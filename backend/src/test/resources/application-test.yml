@@ -1,0 +1,3 @@
+app:
+  jwt:
+    secret-base64: "MDEyMzQ1Njc4OUFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaMDE="
