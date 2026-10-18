@@ -1,0 +1,30 @@
+package com.kidsfinance.wallet;
+
+import com.kidsfinance.wallet.dto.response.WalletResponse;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/children/me")
+@RequiredArgsConstructor
+public class ChildWalletController {
+
+    private final WalletService walletService;
+
+    @GetMapping("/wallet")
+    public WalletResponse getWallet(
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+
+        Long childUserId =
+                Long.parseLong(jwt.getSubject());
+
+        return walletService.getWalletForChild(
+                childUserId
+        );
+    }
+}

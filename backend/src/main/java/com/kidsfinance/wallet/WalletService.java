@@ -10,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.kidsfinance.child.ChildProfileRepository;
+
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -23,6 +25,7 @@ public class WalletService {
     private final WalletRepository walletRepository;
     private final WalletTransactionRepository walletTransactionRepository;
     private final ParentChildLinkRepository parentChildLinkRepository;
+    private final ChildProfileRepository childProfileRepository;
 
     @Transactional
     public Wallet createInitialWallet(ChildProfile child) {
@@ -236,5 +239,32 @@ public class WalletService {
                 transaction.getDescription(),
                 transaction.getCreatedAt()
         );
+    }
+
+    @Transactional(readOnly = true)
+    public WalletResponse getWalletForChild(
+            Long childUserId
+    ) {
+
+        ChildProfile child =
+                childProfileRepository
+                        .findByUser_Id(childUserId)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Child profile not found for authenticated user"
+                                )
+                        );
+
+        Wallet wallet =
+                walletRepository
+                        .findByChild_Id(child.getId())
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Wallet not found for child: "
+                                                + child.getId()
+                                )
+                        );
+
+        return toWalletResponse(wallet);
     }
 }

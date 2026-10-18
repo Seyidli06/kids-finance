@@ -56,7 +56,8 @@ public class ChildService {
                 .role(UserRole.CHILD)
                 .build();
 
-        User savedUser = userRepository.save(user);
+        User savedUser =
+                userRepository.save(user);
 
         ChildProfile child = ChildProfile.builder()
                 .user(savedUser)
@@ -67,23 +68,55 @@ public class ChildService {
         ChildProfile savedChild =
                 childProfileRepository.save(child);
 
-        ParentChildLink link = ParentChildLink.builder()
-                .parent(parent)
-                .child(savedChild)
-                .build();
+        ParentChildLink link =
+                ParentChildLink.builder()
+                        .parent(parent)
+                        .child(savedChild)
+                        .build();
 
         parentChildLinkRepository.save(link);
 
         walletService.createInitialWallet(savedChild);
 
+        return toResponse(
+                savedChild,
+                savedUser
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public ChildResponse getCurrentChild(
+            Long childUserId
+    ) {
+
+        ChildProfile child =
+                childProfileRepository
+                        .findByUser_Id(childUserId)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Child profile not found for authenticated user"
+                                )
+                        );
+
+        return toResponse(
+                child,
+                child.getUser()
+        );
+    }
+
+    private ChildResponse toResponse(
+            ChildProfile child,
+            User user
+    ) {
+
         return new ChildResponse(
-                savedChild.getId(),
-                savedUser.getId(),
-                savedUser.getUsername(),
-                savedChild.getDisplayName(),
-                savedChild.getAge(),
-                savedChild.getXp(),
-                savedChild.getLevel()
+                child.getId(),
+                user.getId(),
+                user.getUsername(),
+                child.getDisplayName(),
+                child.getAge(),
+                child.getXp(),
+                child.getLevel()
         );
     }
 }

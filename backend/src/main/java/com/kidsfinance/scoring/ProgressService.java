@@ -22,11 +22,12 @@ public class ProgressService {
             Long childProfileId
     ) {
 
-        boolean belongsToParent = parentChildLinkRepository
-                .existsByParent_User_IdAndChild_Id(
-                        parentUserId,
-                        childProfileId
-                );
+        boolean belongsToParent =
+                parentChildLinkRepository
+                        .existsByParent_User_IdAndChild_Id(
+                                parentUserId,
+                                childProfileId
+                        );
 
         if (!belongsToParent) {
             throw new ResourceNotFoundException(
@@ -34,19 +35,47 @@ public class ProgressService {
             );
         }
 
-        ChildProfile child = childProfileRepository
-                .findById(childProfileId)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Child not found for authenticated parent"
-                        )
-                );
+        ChildProfile child =
+                childProfileRepository
+                        .findById(childProfileId)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Child not found for authenticated parent"
+                                )
+                        );
 
-        int xpPerLevel = ScoringService.XP_PER_LEVEL;
+        return toProgressResponse(child);
+    }
 
-        int xpInCurrentLevel = child.getXp() % xpPerLevel;
+    @Transactional(readOnly = true)
+    public ChildProgressResponse getProgressForChild(
+            Long childUserId
+    ) {
 
-        int xpToNextLevel = xpPerLevel - xpInCurrentLevel;
+        ChildProfile child =
+                childProfileRepository
+                        .findByUser_Id(childUserId)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Child profile not found for authenticated user"
+                                )
+                        );
+
+        return toProgressResponse(child);
+    }
+
+    private ChildProgressResponse toProgressResponse(
+            ChildProfile child
+    ) {
+
+        int xpPerLevel =
+                ScoringService.XP_PER_LEVEL;
+
+        int xpInCurrentLevel =
+                child.getXp() % xpPerLevel;
+
+        int xpToNextLevel =
+                xpPerLevel - xpInCurrentLevel;
 
         return new ChildProgressResponse(
                 child.getId(),
