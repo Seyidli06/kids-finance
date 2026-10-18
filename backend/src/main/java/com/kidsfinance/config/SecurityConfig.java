@@ -30,10 +30,12 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
 
-                        // Public endpoints
                         .requestMatchers(
                                 "/actuator/health",
-                                "/error"
+                                "/error",
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html"
                         ).permitAll()
 
                         .requestMatchers(
@@ -42,7 +44,7 @@ public class SecurityConfig {
                                 "/api/auth/login"
                         ).permitAll()
 
-                        // Parent: children
+                        
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/parents/me/children"
