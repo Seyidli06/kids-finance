@@ -44,7 +44,7 @@ public class SecurityConfig {
                                 "/api/auth/login"
                         ).permitAll()
 
-                        
+
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/parents/me/children"
