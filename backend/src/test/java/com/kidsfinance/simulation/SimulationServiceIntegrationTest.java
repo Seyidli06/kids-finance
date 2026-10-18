@@ -558,4 +558,82 @@ class SimulationServiceIntegrationTest {
         assertThat(childAfter.getLevel())
                 .isEqualTo(1);
     }
+
+    @Test
+    void shouldAllowChildToCompleteSimulationUsingOwnUserIdentity() {
+
+        ParentResponse parent =
+                parentService.createParent(
+                        new CreateParentRequest(
+                                "child_flow_parent",
+                                "Password123!",
+                                "Child Flow Parent",
+                                "child.flow.parent@example.com"
+                        )
+                );
+
+        ChildResponse child =
+                childService.createChildForParent(
+                        parent.userId(),
+                        new CreateChildRequest(
+                                "child_flow_child",
+                                "Password123!",
+                                "Child Flow Child",
+                                (short) 12
+                        )
+                );
+
+        SimulationDecisionResponse decision =
+                simulationService.makeDecisionForChild(
+                        child.userId(),
+                        "SAVE_OR_SPEND_01",
+                        new SimulationDecisionRequest(
+                                "BUY_HEADPHONES"
+                        )
+                );
+
+        assertThat(decision.runId())
+                .isNotNull();
+
+        assertThat(decision.scenarioCode())
+                .isEqualTo("SAVE_OR_SPEND_01");
+
+        assertThat(decision.optionCode())
+                .isEqualTo("BUY_HEADPHONES");
+
+        assertThat(decision.amountSpent())
+                .isEqualByComparingTo(
+                        new BigDecimal("150.00")
+                );
+
+        Wallet wallet =
+                walletRepository
+                        .findByChild_Id(child.id())
+                        .orElseThrow();
+
+        assertThat(wallet.getBalance())
+                .isEqualByComparingTo(
+                        new BigDecimal("850.00")
+                );
+
+        ChildProfile childAfter =
+                childProfileRepository
+                        .findById(child.id())
+                        .orElseThrow();
+
+        assertThat(childAfter.getXp())
+                .isEqualTo(10);
+
+        assertThat(
+                simulationService.getDecisionsForChild(
+                        child.userId()
+                )
+        ).hasSize(1);
+
+        assertThat(
+                simulationService.getRunsForChild(
+                        child.userId()
+                )
+        ).hasSize(1);
+    }
 }

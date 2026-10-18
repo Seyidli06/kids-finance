@@ -113,6 +113,18 @@ public class SecurityConfig {
                                 "/api/children/me/progress"
                         ).hasRole("CHILD")
 
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/children/me/simulations",
+                                "/api/children/me/simulations/decisions",
+                                "/api/children/me/simulations/runs"
+                        ).hasRole("CHILD")
+
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/children/me/simulations/*/decisions"
+                        ).hasRole("CHILD")
+
                         // Everything else remains blocked
                         .anyRequest().denyAll()
                 )

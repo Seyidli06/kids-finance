@@ -8,6 +8,7 @@ import com.kidsfinance.scoring.ScoringService;
 import com.kidsfinance.simulation.dto.request.SimulationDecisionRequest;
 import com.kidsfinance.simulation.dto.response.SimulationDecisionResponse;
 import com.kidsfinance.simulation.dto.response.SimulationOptionResponse;
+import com.kidsfinance.simulation.dto.response.SimulationRunResponse;
 import com.kidsfinance.simulation.dto.response.SimulationScenarioResponse;
 import com.kidsfinance.wallet.WalletService;
 import com.kidsfinance.wallet.dto.response.WalletTransactionResponse;
@@ -18,22 +19,24 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
 
-import com.kidsfinance.simulation.dto.response.SimulationRunResponse;
-
 @Service
 @RequiredArgsConstructor
 public class SimulationService {
 
     private final SimulationScenarioRepository simulationScenarioRepository;
     private final SimulationOptionRepository simulationOptionRepository;
+    private final SimulationDecisionRepository simulationDecisionRepository;
+    private final SimulationRunRepository simulationRunRepository;
 
     private final ParentChildLinkRepository parentChildLinkRepository;
     private final ChildProfileRepository childProfileRepository;
-    private final SimulationDecisionRepository simulationDecisionRepository;
+
     private final WalletService walletService;
     private final ScoringService scoringService;
 
-    private final SimulationRunRepository simulationRunRepository;
+    // =========================
+    // Parent API
+    // =========================
 
     @Transactional(readOnly = true)
     public List<SimulationScenarioResponse> getScenariosForParent(
@@ -46,11 +49,7 @@ public class SimulationService {
                 childProfileId
         );
 
-        return simulationScenarioRepository
-                .findAllByActiveTrueOrderByDisplayOrderAsc()
-                .stream()
-                .map(this::toScenarioResponse)
-                .toList();
+        return getActiveScenarios();
     }
 
     @Transactional
@@ -66,17 +65,128 @@ public class SimulationService {
                 childProfileId
         );
 
-        ChildProfile child = childProfileRepository
-                .findById(childProfileId)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Child not found for authenticated parent"
-                        )
+        ChildProfile child =
+                getChildByIdForParent(
+                        childProfileId
                 );
+
+        return processDecision(
+                child,
+                scenarioCode,
+                request
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public List<SimulationDecisionResponse> getDecisionsForParent(
+            Long parentUserId,
+            Long childProfileId
+    ) {
+
+        verifyChildBelongsToParent(
+                parentUserId,
+                childProfileId
+        );
+
+        return getDecisionHistory(
+                childProfileId
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public List<SimulationRunResponse> getRunsForParent(
+            Long parentUserId,
+            Long childProfileId
+    ) {
+
+        verifyChildBelongsToParent(
+                parentUserId,
+                childProfileId
+        );
+
+        return getRunHistory(
+                childProfileId
+        );
+    }
+
+    // =========================
+    // Child API
+    // =========================
+
+    @Transactional(readOnly = true)
+    public List<SimulationScenarioResponse> getScenariosForChild(
+            Long childUserId
+    ) {
+
+        getChildByUserId(childUserId);
+
+        return getActiveScenarios();
+    }
+
+    @Transactional
+    public SimulationDecisionResponse makeDecisionForChild(
+            Long childUserId,
+            String scenarioCode,
+            SimulationDecisionRequest request
+    ) {
+
+        ChildProfile child =
+                getChildByUserId(
+                        childUserId
+                );
+
+        return processDecision(
+                child,
+                scenarioCode,
+                request
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public List<SimulationDecisionResponse> getDecisionsForChild(
+            Long childUserId
+    ) {
+
+        ChildProfile child =
+                getChildByUserId(
+                        childUserId
+                );
+
+        return getDecisionHistory(
+                child.getId()
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public List<SimulationRunResponse> getRunsForChild(
+            Long childUserId
+    ) {
+
+        ChildProfile child =
+                getChildByUserId(
+                        childUserId
+                );
+
+        return getRunHistory(
+                child.getId()
+        );
+    }
+
+    // =========================
+    // Shared business logic
+    // =========================
+
+    private SimulationDecisionResponse processDecision(
+            ChildProfile child,
+            String scenarioCode,
+            SimulationDecisionRequest request
+    ) {
 
         SimulationScenario scenario =
                 simulationScenarioRepository
-                        .findByCodeAndActiveTrue(scenarioCode)
+                        .findByCodeAndActiveTrue(
+                                scenarioCode
+                        )
                         .orElseThrow(() ->
                                 new ResourceNotFoundException(
                                         "Simulation scenario not found"
@@ -106,17 +216,16 @@ public class SimulationService {
                                 .build()
                 );
 
-
-        BigDecimal amountSpent = selectedOption.getCost();
+        BigDecimal amountSpent =
+                selectedOption.getCost();
 
         Long walletTransactionId = null;
 
         if (amountSpent.signum() > 0) {
 
             WalletTransactionResponse walletTransaction =
-                    walletService.debit(
-                            parentUserId,
-                            childProfileId,
+                    walletService.debitForSimulation(
+                            child.getId(),
                             amountSpent,
                             "Simulation "
                                     + scenario.getCode()
@@ -130,7 +239,9 @@ public class SimulationService {
 
         int xpEarned =
                 scoringService
-                        .awardScenarioCompletionXp(child);
+                        .awardScenarioCompletionXp(
+                                child
+                        );
 
         SimulationDecision decision =
                 SimulationDecision.builder()
@@ -160,48 +271,94 @@ public class SimulationService {
 
         run.complete();
 
-        return new SimulationDecisionResponse(
-                savedDecision.getId(),
-                savedDecision.getRun().getId(),
-                savedDecision.getScenarioCode(),
-                savedDecision.getOptionCode(),
-                savedDecision.getAmountSpent(),
-                savedDecision.getWalletTransactionId(),
-                savedDecision.getXpEarned(),
-                savedDecision.getCreatedAt()
+        return toDecisionResponse(
+                savedDecision
         );
     }
 
-    @Transactional(readOnly = true)
-    public List<SimulationDecisionResponse> getDecisionsForParent(
-            Long parentUserId,
+    private List<SimulationScenarioResponse> getActiveScenarios() {
+
+        return simulationScenarioRepository
+                .findAllByActiveTrueOrderByDisplayOrderAsc()
+                .stream()
+                .map(this::toScenarioResponse)
+                .toList();
+    }
+
+    private List<SimulationDecisionResponse> getDecisionHistory(
             Long childProfileId
     ) {
-
-        verifyChildBelongsToParent(
-                parentUserId,
-                childProfileId
-        );
 
         return simulationDecisionRepository
                 .findAllByChild_IdOrderByCreatedAtDescIdDesc(
                         childProfileId
                 )
                 .stream()
-                .map(decision ->
-                        new SimulationDecisionResponse(
-                                decision.getId(),
-                                decision.getRun().getId(),
-                                decision.getScenarioCode(),
-                                decision.getOptionCode(),
-                                decision.getAmountSpent(),
-                                decision.getWalletTransactionId(),
-                                decision.getXpEarned(),
-                                decision.getCreatedAt()
-                        )
-                )
+                .map(this::toDecisionResponse)
                 .toList();
     }
+
+    private List<SimulationRunResponse> getRunHistory(
+            Long childProfileId
+    ) {
+
+        return simulationRunRepository
+                .findAllByChild_IdOrderByStartedAtDescIdDesc(
+                        childProfileId
+                )
+                .stream()
+                .map(this::toRunResponse)
+                .toList();
+    }
+
+    private ChildProfile getChildByIdForParent(
+            Long childProfileId
+    ) {
+
+        return childProfileRepository
+                .findById(childProfileId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Child not found for authenticated parent"
+                        )
+                );
+    }
+
+    private ChildProfile getChildByUserId(
+            Long childUserId
+    ) {
+
+        return childProfileRepository
+                .findByUser_Id(childUserId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Child profile not found for authenticated user"
+                        )
+                );
+    }
+
+    private void verifyChildBelongsToParent(
+            Long parentUserId,
+            Long childProfileId
+    ) {
+
+        boolean belongsToParent =
+                parentChildLinkRepository
+                        .existsByParent_User_IdAndChild_Id(
+                                parentUserId,
+                                childProfileId
+                        );
+
+        if (!belongsToParent) {
+            throw new ResourceNotFoundException(
+                    "Child not found for authenticated parent"
+            );
+        }
+    }
+
+    // =========================
+    // Mapping
+    // =========================
 
     private SimulationScenarioResponse toScenarioResponse(
             SimulationScenario scenario
@@ -231,50 +388,32 @@ public class SimulationService {
         );
     }
 
-    private void verifyChildBelongsToParent(
-            Long parentUserId,
-            Long childProfileId
+    private SimulationDecisionResponse toDecisionResponse(
+            SimulationDecision decision
     ) {
 
-        boolean belongsToParent =
-                parentChildLinkRepository
-                        .existsByParent_User_IdAndChild_Id(
-                                parentUserId,
-                                childProfileId
-                        );
-
-        if (!belongsToParent) {
-            throw new ResourceNotFoundException(
-                    "Child not found for authenticated parent"
-            );
-        }
+        return new SimulationDecisionResponse(
+                decision.getId(),
+                decision.getRun().getId(),
+                decision.getScenarioCode(),
+                decision.getOptionCode(),
+                decision.getAmountSpent(),
+                decision.getWalletTransactionId(),
+                decision.getXpEarned(),
+                decision.getCreatedAt()
+        );
     }
 
-    @Transactional(readOnly = true)
-    public List<SimulationRunResponse> getRunsForParent(
-            Long parentUserId,
-            Long childProfileId
+    private SimulationRunResponse toRunResponse(
+            SimulationRun run
     ) {
 
-        verifyChildBelongsToParent(
-                parentUserId,
-                childProfileId
+        return new SimulationRunResponse(
+                run.getId(),
+                run.getScenario().getCode(),
+                run.getStatus(),
+                run.getStartedAt(),
+                run.getCompletedAt()
         );
-
-        return simulationRunRepository
-                .findAllByChild_IdOrderByStartedAtDescIdDesc(
-                        childProfileId
-                )
-                .stream()
-                .map(run ->
-                        new SimulationRunResponse(
-                                run.getId(),
-                                run.getScenario().getCode(),
-                                run.getStatus(),
-                                run.getStartedAt(),
-                                run.getCompletedAt()
-                        )
-                )
-                .toList();
     }
 }

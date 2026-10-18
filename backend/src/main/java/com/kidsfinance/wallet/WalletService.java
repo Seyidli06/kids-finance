@@ -1,6 +1,7 @@
 package com.kidsfinance.wallet;
 
 import com.kidsfinance.child.ChildProfile;
+import com.kidsfinance.child.ChildProfileRepository;
 import com.kidsfinance.common.exception.ConflictException;
 import com.kidsfinance.common.exception.ResourceNotFoundException;
 import com.kidsfinance.family.ParentChildLinkRepository;
@@ -8,9 +9,8 @@ import com.kidsfinance.wallet.dto.response.WalletResponse;
 import com.kidsfinance.wallet.dto.response.WalletTransactionResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-
-import com.kidsfinance.child.ChildProfileRepository;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -42,7 +42,8 @@ public class WalletService {
                 .currency(WalletCurrency.AZN)
                 .build();
 
-        Wallet savedWallet = walletRepository.save(wallet);
+        Wallet savedWallet =
+                walletRepository.save(wallet);
 
         WalletTransaction initialTransaction =
                 WalletTransaction.builder()
@@ -53,7 +54,9 @@ public class WalletService {
                         .description("Initial wallet balance")
                         .build();
 
-        walletTransactionRepository.save(initialTransaction);
+        walletTransactionRepository.save(
+                initialTransaction
+        );
 
         return savedWallet;
     }
@@ -69,16 +72,22 @@ public class WalletService {
                 childProfileId
         );
 
-        Wallet wallet = walletRepository
-                .findByChild_Id(childProfileId)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Wallet not found for child: "
-                                        + childProfileId
-                        )
-                );
+        return getWalletResponse(
+                childProfileId
+        );
+    }
 
-        return toWalletResponse(wallet);
+    @Transactional(readOnly = true)
+    public WalletResponse getWalletForChild(
+            Long childUserId
+    ) {
+
+        ChildProfile child =
+                getChildByUserId(childUserId);
+
+        return getWalletResponse(
+                child.getId()
+        );
     }
 
     @Transactional(readOnly = true)
@@ -92,14 +101,8 @@ public class WalletService {
                 childProfileId
         );
 
-        Wallet wallet = walletRepository
-                .findByChild_Id(childProfileId)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Wallet not found for child: "
-                                        + childProfileId
-                        )
-                );
+        Wallet wallet =
+                getWallet(childProfileId);
 
         return walletTransactionRepository
                 .findAllByWallet_IdOrderByCreatedAtDescIdDesc(
@@ -123,7 +126,8 @@ public class WalletService {
                 childProfileId
         );
 
-        Wallet wallet = getWalletForUpdate(childProfileId);
+        Wallet wallet =
+                getWalletForUpdate(childProfileId);
 
         BigDecimal newBalance =
                 wallet.getBalance().add(amount);
@@ -139,10 +143,11 @@ public class WalletService {
                         .description(description)
                         .build();
 
-        WalletTransaction savedTransaction =
-                walletTransactionRepository.save(transaction);
-
-        return toTransactionResponse(savedTransaction);
+        return toTransactionResponse(
+                walletTransactionRepository.save(
+                        transaction
+                )
+        );
     }
 
     @Transactional
@@ -158,16 +163,56 @@ public class WalletService {
                 childProfileId
         );
 
-        Wallet wallet = getWalletForUpdate(childProfileId);
+        return debitInternal(
+                childProfileId,
+                amount,
+                description
+        );
+    }
 
-        if (wallet.getBalance().compareTo(amount) < 0) {
+    /*
+     * Internal business operation used by the simulation engine.
+     *
+     * Authorization must already have been performed by the caller.
+     * Requiring an existing transaction ensures wallet debit and
+     * simulation decision are committed or rolled back together.
+     */
+    @Transactional(
+            propagation = Propagation.MANDATORY
+    )
+    public WalletTransactionResponse debitForSimulation(
+            Long childProfileId,
+            BigDecimal amount,
+            String description
+    ) {
+
+        return debitInternal(
+                childProfileId,
+                amount,
+                description
+        );
+    }
+
+    private WalletTransactionResponse debitInternal(
+            Long childProfileId,
+            BigDecimal amount,
+            String description
+    ) {
+
+        Wallet wallet =
+                getWalletForUpdate(childProfileId);
+
+        if (wallet.getBalance()
+                .compareTo(amount) < 0) {
+
             throw new ConflictException(
                     "Insufficient wallet balance"
             );
         }
 
         BigDecimal newBalance =
-                wallet.getBalance().subtract(amount);
+                wallet.getBalance()
+                        .subtract(amount);
 
         wallet.setBalance(newBalance);
 
@@ -181,15 +226,58 @@ public class WalletService {
                         .build();
 
         WalletTransaction savedTransaction =
-                walletTransactionRepository.save(transaction);
+                walletTransactionRepository
+                        .save(transaction);
 
-        return toTransactionResponse(savedTransaction);
+        return toTransactionResponse(
+                savedTransaction
+        );
     }
 
-    private Wallet getWalletForUpdate(Long childProfileId) {
+    private ChildProfile getChildByUserId(
+            Long childUserId
+    ) {
+
+        return childProfileRepository
+                .findByUser_Id(childUserId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Child profile not found for authenticated user"
+                        )
+                );
+    }
+
+    private WalletResponse getWalletResponse(
+            Long childProfileId
+    ) {
+
+        return toWalletResponse(
+                getWallet(childProfileId)
+        );
+    }
+
+    private Wallet getWallet(
+            Long childProfileId
+    ) {
 
         return walletRepository
-                .findByChildIdForUpdate(childProfileId)
+                .findByChild_Id(childProfileId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Wallet not found for child: "
+                                        + childProfileId
+                        )
+                );
+    }
+
+    private Wallet getWalletForUpdate(
+            Long childProfileId
+    ) {
+
+        return walletRepository
+                .findByChildIdForUpdate(
+                        childProfileId
+                )
                 .orElseThrow(() ->
                         new ResourceNotFoundException(
                                 "Wallet not found for child: "
@@ -217,7 +305,9 @@ public class WalletService {
         }
     }
 
-    private WalletResponse toWalletResponse(Wallet wallet) {
+    private WalletResponse toWalletResponse(
+            Wallet wallet
+    ) {
 
         return new WalletResponse(
                 wallet.getId(),
@@ -239,32 +329,5 @@ public class WalletService {
                 transaction.getDescription(),
                 transaction.getCreatedAt()
         );
-    }
-
-    @Transactional(readOnly = true)
-    public WalletResponse getWalletForChild(
-            Long childUserId
-    ) {
-
-        ChildProfile child =
-                childProfileRepository
-                        .findByUser_Id(childUserId)
-                        .orElseThrow(() ->
-                                new ResourceNotFoundException(
-                                        "Child profile not found for authenticated user"
-                                )
-                        );
-
-        Wallet wallet =
-                walletRepository
-                        .findByChild_Id(child.getId())
-                        .orElseThrow(() ->
-                                new ResourceNotFoundException(
-                                        "Wallet not found for child: "
-                                                + child.getId()
-                                )
-                        );
-
-        return toWalletResponse(wallet);
     }
 }
