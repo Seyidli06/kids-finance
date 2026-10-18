@@ -4,7 +4,6 @@ import com.kidsfinance.auth.dto.request.LoginRequest;
 import com.kidsfinance.auth.dto.response.LoginResponse;
 import com.kidsfinance.user.User;
 import com.kidsfinance.user.UserRepository;
-import com.kidsfinance.user.UserRole;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -22,6 +21,9 @@ import java.time.Instant;
 @RequiredArgsConstructor
 public class AuthService {
 
+    private static final long ACCESS_TOKEN_TTL_SECONDS =
+            15 * 60;
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtEncoder jwtEncoder;
@@ -33,7 +35,6 @@ public class AuthService {
                 .orElseThrow(this::invalidCredentials);
 
         if (!user.isActive()
-                || user.getRole() != UserRole.PARENT
                 || !passwordEncoder.matches(
                 request.password(),
                 user.getPasswordHash()
@@ -42,14 +43,20 @@ public class AuthService {
         }
 
         Instant now = Instant.now();
-        long expiresIn = 15 * 60;
 
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer("kids-finance-api")
                 .subject(user.getId().toString())
                 .issuedAt(now)
-                .expiresAt(now.plusSeconds(expiresIn))
-                .claim("role", user.getRole().name())
+                .expiresAt(
+                        now.plusSeconds(
+                                ACCESS_TOKEN_TTL_SECONDS
+                        )
+                )
+                .claim(
+                        "role",
+                        user.getRole().name()
+                )
                 .build();
 
         JwsHeader header = JwsHeader
@@ -57,13 +64,18 @@ public class AuthService {
                 .build();
 
         String token = jwtEncoder
-                .encode(JwtEncoderParameters.from(header, claims))
+                .encode(
+                        JwtEncoderParameters.from(
+                                header,
+                                claims
+                        )
+                )
                 .getTokenValue();
 
         return new LoginResponse(
                 token,
                 "Bearer",
-                expiresIn
+                ACCESS_TOKEN_TTL_SECONDS
         );
     }
 
