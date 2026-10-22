@@ -110,6 +110,7 @@ public class SecurityConfig {
                                 HttpMethod.GET,
                                 "/api/children/me",
                                 "/api/children/me/wallet",
+                                "/api/children/me/wallet/transactions",
                                 "/api/children/me/progress"
                         ).hasRole("CHILD")
 
@@ -157,4 +158,6 @@ public class SecurityConfig {
 
         return authenticationConverter;
     }
+
+
 }

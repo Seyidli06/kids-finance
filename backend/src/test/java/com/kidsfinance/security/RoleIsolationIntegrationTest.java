@@ -157,7 +157,7 @@ class RoleIsolationIntegrationTest {
                 .andExpect(status().isOk());
 
         mockMvc.perform(
-                        get("/api/children/me/wallet")
+                        get("/api/children/me/wallet/transactions")
                                 .header(
                                         "Authorization",
                                         authorization

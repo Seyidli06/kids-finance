@@ -330,4 +330,24 @@ public class WalletService {
                 transaction.getCreatedAt()
         );
     }
+
+    @Transactional(readOnly = true)
+    public List<WalletTransactionResponse> getTransactionsForChild(
+            Long childUserId
+    ) {
+
+        ChildProfile child =
+                getChildByUserId(childUserId);
+
+        Wallet wallet =
+                getWallet(child.getId());
+
+        return walletTransactionRepository
+                .findAllByWallet_IdOrderByCreatedAtDescIdDesc(
+                        wallet.getId()
+                )
+                .stream()
+                .map(this::toTransactionResponse)
+                .toList();
+    }
 }
