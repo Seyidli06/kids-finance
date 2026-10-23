@@ -11,6 +11,7 @@ import com.kidsfinance.scoring.ScoringService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.kidsfinance.scoring.SkillScoringService;
 
 import java.util.List;
 
@@ -23,6 +24,7 @@ public class ChallengeService {
     private final ChallengeAttemptRepository challengeAttemptRepository;
     private final ChildProfileRepository childProfileRepository;
     private final ScoringService scoringService;
+    private final SkillScoringService skillScoringService;
 
     @Transactional(readOnly = true)
     public List<ChallengeResponse> getChallengesForChild(
@@ -111,6 +113,12 @@ public class ChallengeService {
                                 );
             }
         }
+
+        skillScoringService.recordActivity(
+                child,
+                challenge.getSkillType(),
+                correct ? 100 : 0
+        );
 
         ChallengeAttempt attempt =
                 ChallengeAttempt.builder()

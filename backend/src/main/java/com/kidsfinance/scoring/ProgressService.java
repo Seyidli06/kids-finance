@@ -15,6 +15,7 @@ public class ProgressService {
 
     private final ParentChildLinkRepository parentChildLinkRepository;
     private final ChildProfileRepository childProfileRepository;
+    private final SkillScoringService skillScoringService;
 
     @Transactional(readOnly = true)
     public ChildProgressResponse getProgressForParent(
@@ -77,14 +78,35 @@ public class ProgressService {
         int xpToNextLevel =
                 xpPerLevel - xpInCurrentLevel;
 
-        return new ChildProgressResponse(
+        var skillScores =
+                skillScoringService
+                        .getScoresForChild(
+                                child.getId()
+                        );
+
+        int overallScore =
+                (int) Math.round(
+                        skillScores.stream()
+                                .mapToInt(
+                                        score ->
+                                                score.score()
+                                )
+                                .average()
+                                .orElse(0)
+                );
+
+        ChildProgressResponse childProgressResponse = new ChildProgressResponse(
                 child.getId(),
                 child.getDisplayName(),
                 child.getXp(),
                 child.getLevel(),
                 xpInCurrentLevel,
                 xpPerLevel,
-                xpToNextLevel
+                xpToNextLevel,
+                overallScore,
+                skillScores
         );
+        return childProgressResponse;
+
     }
 }

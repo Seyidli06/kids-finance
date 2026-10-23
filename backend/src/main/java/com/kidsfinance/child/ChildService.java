@@ -16,11 +16,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.kidsfinance.scoring.SkillScoringService;
 
 @Service
 @RequiredArgsConstructor
 public class ChildService {
 
+    private final SkillScoringService skillScoringService;
     private final UserRepository userRepository;
     private final ChildProfileRepository childProfileRepository;
     private final ParentProfileRepository parentProfileRepository;
@@ -77,6 +79,10 @@ public class ChildService {
         parentChildLinkRepository.save(link);
 
         walletService.createInitialWallet(savedChild);
+
+        skillScoringService.initializeScoresForChild(
+                savedChild
+        );
 
         return toResponse(
                 savedChild,

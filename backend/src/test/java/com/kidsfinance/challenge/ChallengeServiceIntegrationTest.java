@@ -62,7 +62,7 @@ class ChallengeServiceIntegrationTest {
                         );
 
         assertThat(challenges)
-                .hasSize(4);
+                .hasSize(5);
 
         assertThat(challenges)
                 .extracting(
@@ -73,6 +73,7 @@ class ChallengeServiceIntegrationTest {
                         "SAVING",
                         "BUDGETING",
                         "SPENDING",
+                        "INVESTING",
                         "INVESTING"
                 );
 

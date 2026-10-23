@@ -3,6 +3,7 @@ package com.kidsfinance.challenge;
 import com.kidsfinance.learning.LearningTopic;
 import jakarta.persistence.*;
 import lombok.*;
+import com.kidsfinance.scoring.SkillType;
 
 import java.time.OffsetDateTime;
 
@@ -43,6 +44,14 @@ public class Challenge {
             )
     )
     private LearningTopic learningTopic;
+
+    @Enumerated(EnumType.STRING)
+    @Column(
+            name = "skill_type",
+            nullable = false,
+            length = 30
+    )
+    private SkillType skillType;
 
     @Column(
             name = "title",
