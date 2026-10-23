@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ScoringService {
 
     private static final int SCENARIO_COMPLETION_XP = 10;
+    private static final int MAIN_SIMULATION_COMPLETION_XP = 10;
 
     public static final int XP_PER_LEVEL = 100;
 
@@ -19,6 +20,16 @@ public class ScoringService {
         return awardXp(
                 child,
                 SCENARIO_COMPLETION_XP
+        );
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public int awardMainSimulationCompletionXp(
+            ChildProfile child
+    ) {
+        return awardXp(
+                child,
+                MAIN_SIMULATION_COMPLETION_XP
         );
     }
 
