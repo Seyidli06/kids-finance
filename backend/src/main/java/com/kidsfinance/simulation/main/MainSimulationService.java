@@ -5,6 +5,8 @@ import com.kidsfinance.child.ChildProfileRepository;
 import com.kidsfinance.common.exception.ResourceNotFoundException;
 import com.kidsfinance.family.ParentChildLinkRepository;
 import com.kidsfinance.scoring.ScoringService;
+import com.kidsfinance.scoring.SkillScoringService;
+import com.kidsfinance.scoring.SkillType;
 import com.kidsfinance.simulation.main.dto.request.MainSimulationRequest;
 import com.kidsfinance.simulation.main.dto.response.MainSimulationRunResponse;
 import lombok.RequiredArgsConstructor;
@@ -38,7 +40,14 @@ public class MainSimulationService {
     private final MainSimulationRunRepository mainSimulationRunRepository;
     private final ChildProfileRepository childProfileRepository;
     private final ParentChildLinkRepository parentChildLinkRepository;
+
     private final ScoringService scoringService;
+    private final SkillScoringService skillScoringService;
+    private final MainSimulationScoringService mainSimulationScoringService;
+
+    // =====================================================
+    // Child
+    // =====================================================
 
     @Transactional
     public MainSimulationRunResponse runForChild(
@@ -61,6 +70,16 @@ public class MainSimulationService {
                                 )
                         );
 
+        /*
+         * Lock the child row because this operation can update:
+         *
+         * - XP
+         * - level
+         * - skill scores
+         *
+         * Keeping these updates inside the same transaction prevents
+         * concurrent simulation runs from losing progress updates.
+         */
         ChildProfile child =
                 childProfileRepository
                         .findByIdForUpdate(
@@ -72,15 +91,82 @@ public class MainSimulationService {
                                 )
                         );
 
+        /*
+         * Main simulation can be replayed.
+         *
+         * XP is awarded only on the first completed run so that the child
+         * cannot farm XP by repeatedly submitting the same simulation.
+         */
         boolean firstRun =
                 !mainSimulationRunRepository
                         .existsByChild_Id(
                                 child.getId()
                         );
 
+        // -------------------------------------------------
+        // Calculate decision quality
+        // -------------------------------------------------
+
+        MainSimulationScoreResult scores =
+                mainSimulationScoringService
+                        .calculate(request);
+
+        /*
+         * Every simulation run is an activity, therefore it updates all
+         * five financial skill dimensions.
+         *
+         * These scores describe the quality of the allocation decision.
+         * They are intentionally calculated before / independently of the
+         * random event because market luck must not determine whether the
+         * child's financial decision was good or bad.
+         */
+        skillScoringService.recordActivity(
+                child,
+                SkillType.SAVING,
+                scores.savingScore()
+        );
+
+        skillScoringService.recordActivity(
+                child,
+                SkillType.BUDGETING,
+                scores.budgetingScore()
+        );
+
+        skillScoringService.recordActivity(
+                child,
+                SkillType.RISK_MANAGEMENT,
+                scores.riskManagementScore()
+        );
+
+        skillScoringService.recordActivity(
+                child,
+                SkillType.INVESTMENT,
+                scores.investmentScore()
+        );
+
+        skillScoringService.recordActivity(
+                child,
+                SkillType.DECISION_MAKING,
+                scores.decisionMakingScore()
+        );
+
+        // -------------------------------------------------
+        // Select event
+        // -------------------------------------------------
+
         MainSimulationEventType event =
                 selectRandomEvent();
 
+        /*
+         * Spending is treated as consumed money.
+         *
+         * Example:
+         *
+         * Start:     1000 AZN
+         * Spending:   100 AZN
+         *
+         * Portfolio before event = 900 AZN
+         */
         BigDecimal portfolioValueBeforeEvent =
                 money(
                         STARTING_AMOUNT.subtract(
@@ -108,6 +194,10 @@ public class MainSimulationService {
                         )
                 );
 
+        // -------------------------------------------------
+        // XP
+        // -------------------------------------------------
+
         int xpEarned = 0;
 
         if (firstRun) {
@@ -118,35 +208,103 @@ public class MainSimulationService {
                             );
         }
 
+        // -------------------------------------------------
+        // Persist run
+        // -------------------------------------------------
+
         MainSimulationRun run =
                 MainSimulationRun.builder()
                         .child(child)
-                        .startingAmount(STARTING_AMOUNT)
-                        .cashAmount(money(request.cash()))
-                        .savingAmount(money(request.saving()))
-                        .depositAmount(money(request.deposit()))
-                        .bondAmount(money(request.bond()))
-                        .investmentAmount(money(request.investment()))
-                        .spendingAmount(money(request.spending()))
-                        .businessAmount(money(request.business()))
+
+                        .startingAmount(
+                                STARTING_AMOUNT
+                        )
+
+                        .cashAmount(
+                                money(request.cash())
+                        )
+
+                        .savingAmount(
+                                money(request.saving())
+                        )
+
+                        .depositAmount(
+                                money(request.deposit())
+                        )
+
+                        .bondAmount(
+                                money(request.bond())
+                        )
+
+                        .investmentAmount(
+                                money(request.investment())
+                        )
+
+                        .spendingAmount(
+                                money(request.spending())
+                        )
+
+                        .businessAmount(
+                                money(request.business())
+                        )
+
                         .portfolioValueBeforeEvent(
                                 portfolioValueBeforeEvent
                         )
-                        .eventType(event)
-                        .eventDelta(eventDelta)
-                        .endingAmount(endingAmount)
-                        .netChange(netChange)
-                        .xpEarned(xpEarned)
+
+                        .eventType(
+                                event
+                        )
+
+                        .eventDelta(
+                                eventDelta
+                        )
+
+                        .endingAmount(
+                                endingAmount
+                        )
+
+                        .netChange(
+                                netChange
+                        )
+
+                        .savingScore(
+                                scores.savingScore()
+                        )
+
+                        .budgetingScore(
+                                scores.budgetingScore()
+                        )
+
+                        .riskManagementScore(
+                                scores.riskManagementScore()
+                        )
+
+                        .investmentScore(
+                                scores.investmentScore()
+                        )
+
+                        .decisionMakingScore(
+                                scores.decisionMakingScore()
+                        )
+
+                        .xpEarned(
+                                xpEarned
+                        )
+
                         .build();
 
+        MainSimulationRun savedRun =
+                mainSimulationRunRepository
+                        .save(run);
+
         return toResponse(
-                mainSimulationRunRepository.save(run)
+                savedRun
         );
     }
 
     @Transactional(readOnly = true)
-    public List<MainSimulationRunResponse>
-    getRunsForChild(
+    public List<MainSimulationRunResponse> getRunsForChild(
             Long childUserId
     ) {
 
@@ -164,9 +322,12 @@ public class MainSimulationService {
         );
     }
 
+    // =====================================================
+    // Parent
+    // =====================================================
+
     @Transactional(readOnly = true)
-    public List<MainSimulationRunResponse>
-    getRunsForParent(
+    public List<MainSimulationRunResponse> getRunsForParent(
             Long parentUserId,
             Long childProfileId
     ) {
@@ -189,8 +350,11 @@ public class MainSimulationService {
         );
     }
 
-    private List<MainSimulationRunResponse>
-    getRunHistory(
+    // =====================================================
+    // Shared history
+    // =====================================================
+
+    private List<MainSimulationRunResponse> getRunHistory(
             Long childProfileId
     ) {
 
@@ -202,6 +366,10 @@ public class MainSimulationService {
                 .map(this::toResponse)
                 .toList();
     }
+
+    // =====================================================
+    // Event selection
+    // =====================================================
 
     private MainSimulationEventType selectRandomEvent() {
 
@@ -217,6 +385,10 @@ public class MainSimulationService {
 
         return values[index];
     }
+
+    // =====================================================
+    // Event calculations
+    // =====================================================
 
     private BigDecimal calculateEventDelta(
             MainSimulationEventType event,
@@ -254,8 +426,14 @@ public class MainSimulationService {
                                     );
                 };
 
-        return money(delta);
+        return money(
+                delta
+        );
     }
+
+    // =====================================================
+    // Money normalization
+    // =====================================================
 
     private BigDecimal money(
             BigDecimal value
@@ -267,12 +445,17 @@ public class MainSimulationService {
         );
     }
 
+    // =====================================================
+    // Mapping
+    // =====================================================
+
     private MainSimulationRunResponse toResponse(
             MainSimulationRun run
     ) {
 
         return new MainSimulationRunResponse(
                 run.getId(),
+
                 run.getStartingAmount(),
 
                 run.getCashAmount(),
@@ -292,6 +475,12 @@ public class MainSimulationService {
                 run.getEventDelta(),
                 run.getEndingAmount(),
                 run.getNetChange(),
+
+                run.getSavingScore(),
+                run.getBudgetingScore(),
+                run.getRiskManagementScore(),
+                run.getInvestmentScore(),
+                run.getDecisionMakingScore(),
 
                 run.getXpEarned(),
 

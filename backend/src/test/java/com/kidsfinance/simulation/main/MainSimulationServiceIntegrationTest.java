@@ -15,9 +15,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
-
+import com.kidsfinance.scoring.ProgressService;
+import com.kidsfinance.scoring.SkillType;
 import java.math.BigDecimal;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -41,6 +41,9 @@ class MainSimulationServiceIntegrationTest {
 
     @Autowired
     private MainSimulationService mainSimulationService;
+
+    @Autowired
+    private ProgressService progressService;
 
     @Test
     void shouldRunMainSimulationAndApplyEvent() {
@@ -111,6 +114,33 @@ class MainSimulationServiceIntegrationTest {
 
         assertThat(history)
                 .hasSize(2);
+
+        assertThat(result.savingScore())
+                .isEqualTo(100);
+
+        assertThat(result.budgetingScore())
+                .isEqualTo(100);
+
+        assertThat(result.riskManagementScore())
+                .isEqualTo(100);
+
+        assertThat(result.investmentScore())
+                .isEqualTo(100);
+
+        assertThat(result.decisionMakingScore())
+                .isEqualTo(100);
+
+        var progress =
+                progressService
+                        .getProgressForChild(
+                                child.userId()
+                        );
+
+        assertThat(progress.skillScores())
+                .allSatisfy(skill ->
+                        assertThat(skill.score())
+                                .isEqualTo(100)
+                );
     }
 
     @Test

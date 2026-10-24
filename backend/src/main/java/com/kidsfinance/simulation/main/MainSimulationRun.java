@@ -103,9 +103,41 @@ public class MainSimulationRun {
     private BigDecimal netChange;
 
     @Column(
+            name = "saving_score",
+            nullable = false
+    )
+    private Integer savingScore;
+
+    @Column(
+            name = "budgeting_score",
+            nullable = false
+    )
+    private Integer budgetingScore;
+
+    @Column(
+            name = "risk_management_score",
+            nullable = false
+    )
+    private Integer riskManagementScore;
+
+    @Column(
+            name = "investment_score",
+            nullable = false
+    )
+    private Integer investmentScore;
+
+    @Column(
+            name = "decision_making_score",
+            nullable = false
+    )
+    private Integer decisionMakingScore;
+
+    @Column(
             name = "xp_earned",
             nullable = false
     )
+
+
     private Integer xpEarned;
 
     @Column(

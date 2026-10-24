@@ -29,6 +29,12 @@ public record MainSimulationRunResponse(
         BigDecimal endingAmount,
         BigDecimal netChange,
 
+        Integer savingScore,
+        Integer budgetingScore,
+        Integer riskManagementScore,
+        Integer investmentScore,
+        Integer decisionMakingScore,
+
         Integer xpEarned,
 
         OffsetDateTime createdAt
