@@ -12,7 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.kidsfinance.scoring.SkillScoringService;
-
+import com.kidsfinance.gamification.AchievementService;
 import java.util.List;
 
 @Service
@@ -25,6 +25,7 @@ public class ChallengeService {
     private final ChildProfileRepository childProfileRepository;
     private final ScoringService scoringService;
     private final SkillScoringService skillScoringService;
+    private final AchievementService achievementService;
 
     @Transactional(readOnly = true)
     public List<ChallengeResponse> getChallengesForChild(
@@ -130,11 +131,18 @@ public class ChallengeService {
                         .build();
 
         ChallengeAttempt saved =
-                challengeAttemptRepository.save(
-                        attempt
-                );
+                challengeAttemptRepository
+                        .saveAndFlush(
+                                attempt
+                        );
 
-        return toAttemptResponse(saved);
+        achievementService.evaluateAchievements(
+                child
+        );
+
+        return toAttemptResponse(
+                saved
+        );
     }
 
     @Transactional(readOnly = true)

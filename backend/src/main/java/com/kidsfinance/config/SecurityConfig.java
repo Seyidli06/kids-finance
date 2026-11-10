@@ -155,6 +155,16 @@ public class SecurityConfig {
                                 "/api/children/me/simulations/runs"
                         ).hasRole("CHILD")
 
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/parents/me/children/*/achievements"
+                        ).hasRole("PARENT")
+
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/children/me/achievements"
+                        ).hasRole("CHILD")
+
 
                         // =========================================
                         // Everything else blocked

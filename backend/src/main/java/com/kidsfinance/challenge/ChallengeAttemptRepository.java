@@ -12,8 +12,13 @@ public interface ChallengeAttemptRepository
             Long challengeId
     );
 
+    boolean existsByChild_IdAndCorrectTrue(
+            Long childProfileId
+    );
+
     List<ChallengeAttempt>
     findAllByChild_IdOrderByCreatedAtDescIdDesc(
             Long childProfileId
     );
+
 }

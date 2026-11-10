@@ -17,6 +17,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+import com.kidsfinance.gamification.AchievementService;
 
 @Service
 @RequiredArgsConstructor
@@ -44,10 +45,8 @@ public class SimulationService {
     private final ScoringService scoringService;
     private final SkillScoringService skillScoringService;
     private final SimulationScoringService mainSimulationScoringService;
+    private final AchievementService achievementService;
 
-    // =====================================================
-    // Child
-    // =====================================================
 
     @Transactional
     public SimulationRunResponse runForChild(
@@ -296,7 +295,13 @@ public class SimulationService {
 
         SimulationRun savedRun =
                 mainSimulationRunRepository
-                        .save(run);
+                        .saveAndFlush(
+                                run
+                        );
+
+        achievementService.evaluateAchievements(
+                child
+        );
 
         return toResponse(
                 savedRun
