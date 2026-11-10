@@ -1,11 +1,11 @@
-package com.kidsfinance.simulation.main;
+package com.kidsfinance.simulation;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
 @Getter
 @RequiredArgsConstructor
-public enum MainSimulationEventType {
+public enum SimulationEventType {
 
     STOCK_MARKET_DROP(
             "Fond bazarı -15%",

@@ -1,6 +1,6 @@
-package com.kidsfinance.simulation.main;
+package com.kidsfinance.simulation;
 
-import com.kidsfinance.simulation.main.dto.request.MainSimulationRequest;
+import com.kidsfinance.simulation.dto.request.SimulationRequest;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -8,7 +8,7 @@ import java.math.RoundingMode;
 import java.util.List;
 
 @Service
-public class MainSimulationScoringService {
+public class SimulationScoringService {
 
     private static final BigDecimal SAVING_TARGET =
             new BigDecimal("300.00");
@@ -16,8 +16,8 @@ public class MainSimulationScoringService {
     private static final BigDecimal MEANINGFUL_INVESTMENT =
             new BigDecimal("50.00");
 
-    public MainSimulationScoreResult calculate(
-            MainSimulationRequest request
+    public SimulationScoreResult calculate(
+            SimulationRequest request
     ) {
 
         int savingScore =
@@ -42,7 +42,7 @@ public class MainSimulationScoringService {
                         ) / 4.0f
                 );
 
-        return new MainSimulationScoreResult(
+        return new SimulationScoreResult(
                 savingScore,
                 budgetingScore,
                 riskManagementScore,
@@ -52,7 +52,7 @@ public class MainSimulationScoringService {
     }
 
     private int calculateSavingScore(
-            MainSimulationRequest request
+            SimulationRequest request
     ) {
 
         BigDecimal protectedMoney =
@@ -80,7 +80,7 @@ public class MainSimulationScoringService {
     }
 
     private int calculateBudgetingScore(
-            MainSimulationRequest request
+            SimulationRequest request
     ) {
 
         int score = 0;
@@ -140,7 +140,7 @@ public class MainSimulationScoringService {
     }
 
     private int calculateRiskManagementScore(
-            MainSimulationRequest request
+            SimulationRequest request
     ) {
 
         BigDecimal maximumAllocation =
@@ -207,7 +207,7 @@ public class MainSimulationScoringService {
     }
 
     private int calculateInvestmentScore(
-            MainSimulationRequest request
+            SimulationRequest request
     ) {
 
         int meaningfulChoices = 0;
@@ -249,7 +249,7 @@ public class MainSimulationScoringService {
     }
 
     private int countPositiveAllocations(
-            MainSimulationRequest request
+            SimulationRequest request
     ) {
 
         return (int) List.of(

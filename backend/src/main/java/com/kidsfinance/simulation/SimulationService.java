@@ -5,155 +5,301 @@ import com.kidsfinance.child.ChildProfileRepository;
 import com.kidsfinance.common.exception.ResourceNotFoundException;
 import com.kidsfinance.family.ParentChildLinkRepository;
 import com.kidsfinance.scoring.ScoringService;
-import com.kidsfinance.simulation.dto.request.SimulationDecisionRequest;
-import com.kidsfinance.simulation.dto.response.SimulationDecisionResponse;
-import com.kidsfinance.simulation.dto.response.SimulationOptionResponse;
+import com.kidsfinance.scoring.SkillScoringService;
+import com.kidsfinance.scoring.SkillType;
+import com.kidsfinance.simulation.dto.request.SimulationRequest;
 import com.kidsfinance.simulation.dto.response.SimulationRunResponse;
-import com.kidsfinance.simulation.dto.response.SimulationScenarioResponse;
-import com.kidsfinance.wallet.WalletService;
-import com.kidsfinance.wallet.dto.response.WalletTransactionResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 @RequiredArgsConstructor
 public class SimulationService {
 
-    private final SimulationScenarioRepository simulationScenarioRepository;
-    private final SimulationOptionRepository simulationOptionRepository;
-    private final SimulationDecisionRepository simulationDecisionRepository;
-    private final SimulationRunRepository simulationRunRepository;
+    private static final BigDecimal STARTING_AMOUNT =
+            new BigDecimal("1000.00");
 
-    private final ParentChildLinkRepository parentChildLinkRepository;
+    private static final BigDecimal STOCK_DROP_RATE =
+            new BigDecimal("0.15");
+
+    private static final BigDecimal DEPOSIT_RATE =
+            new BigDecimal("0.06");
+
+    private static final BigDecimal BUSINESS_RATE =
+            new BigDecimal("0.20");
+
+    private static final BigDecimal UNEXPECTED_EXPENSE =
+            new BigDecimal("200.00");
+
+    private final SimulationRunRepository mainSimulationRunRepository;
     private final ChildProfileRepository childProfileRepository;
+    private final ParentChildLinkRepository parentChildLinkRepository;
 
-    private final WalletService walletService;
     private final ScoringService scoringService;
+    private final SkillScoringService skillScoringService;
+    private final SimulationScoringService mainSimulationScoringService;
 
-    // =========================
-    // Parent API
-    // =========================
-
-    @Transactional(readOnly = true)
-    public List<SimulationScenarioResponse> getScenariosForParent(
-            Long parentUserId,
-            Long childProfileId
-    ) {
-
-        verifyChildBelongsToParent(
-                parentUserId,
-                childProfileId
-        );
-
-        return getActiveScenarios();
-    }
+    // =====================================================
+    // Child
+    // =====================================================
 
     @Transactional
-    public SimulationDecisionResponse makeDecision(
-            Long parentUserId,
-            Long childProfileId,
-            String scenarioCode,
-            SimulationDecisionRequest request
-    ) {
-
-        verifyChildBelongsToParent(
-                parentUserId,
-                childProfileId
-        );
-
-        ChildProfile child =
-                getChildByIdForParent(
-                        childProfileId
-                );
-
-        return processDecision(
-                child,
-                scenarioCode,
-                request
-        );
-    }
-
-    @Transactional(readOnly = true)
-    public List<SimulationDecisionResponse> getDecisionsForParent(
-            Long parentUserId,
-            Long childProfileId
-    ) {
-
-        verifyChildBelongsToParent(
-                parentUserId,
-                childProfileId
-        );
-
-        return getDecisionHistory(
-                childProfileId
-        );
-    }
-
-    @Transactional(readOnly = true)
-    public List<SimulationRunResponse> getRunsForParent(
-            Long parentUserId,
-            Long childProfileId
-    ) {
-
-        verifyChildBelongsToParent(
-                parentUserId,
-                childProfileId
-        );
-
-        return getRunHistory(
-                childProfileId
-        );
-    }
-
-    // =========================
-    // Child API
-    // =========================
-
-    @Transactional(readOnly = true)
-    public List<SimulationScenarioResponse> getScenariosForChild(
-            Long childUserId
-    ) {
-
-        getChildByUserId(childUserId);
-
-        return getActiveScenarios();
-    }
-
-    @Transactional
-    public SimulationDecisionResponse makeDecisionForChild(
+    public SimulationRunResponse runForChild(
             Long childUserId,
-            String scenarioCode,
-            SimulationDecisionRequest request
+            SimulationRequest request
     ) {
 
-        ChildProfile child =
-                getChildByUserId(
-                        childUserId
-                );
+        if (!request.isAllocationTotalValid()) {
+            throw new IllegalArgumentException(
+                    "Allocations must total exactly 1000.00 AZN"
+            );
+        }
 
-        return processDecision(
+        ChildProfile resolvedChild =
+                childProfileRepository
+                        .findByUser_Id(childUserId)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Child profile not found for authenticated user"
+                                )
+                        );
+
+        /*
+         * Lock the child row because this operation can update:
+         *
+         * - XP
+         * - level
+         * - skill scores
+         *
+         * Keeping these updates inside the same transaction prevents
+         * concurrent simulation runs from losing progress updates.
+         */
+        ChildProfile child =
+                childProfileRepository
+                        .findByIdForUpdate(
+                                resolvedChild.getId()
+                        )
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Child profile not found"
+                                )
+                        );
+
+        /*
+         * Main simulation can be replayed.
+         *
+         * XP is awarded only on the first completed run so that the child
+         * cannot farm XP by repeatedly submitting the same simulation.
+         */
+        boolean firstRun =
+                !mainSimulationRunRepository
+                        .existsByChild_Id(
+                                child.getId()
+                        );
+
+        // -------------------------------------------------
+        // Calculate decision quality
+        // -------------------------------------------------
+
+        SimulationScoreResult scores =
+                mainSimulationScoringService
+                        .calculate(request);
+
+        /*
+         * Every simulation run is an activity, therefore it updates all
+         * five financial skill dimensions.
+         *
+         * These scores describe the quality of the allocation decision.
+         * They are intentionally calculated before / independently of the
+         * random event because market luck must not determine whether the
+         * child's financial decision was good or bad.
+         */
+        skillScoringService.recordActivity(
                 child,
-                scenarioCode,
-                request
+                SkillType.SAVING,
+                scores.savingScore()
         );
-    }
 
-    @Transactional(readOnly = true)
-    public List<SimulationDecisionResponse> getDecisionsForChild(
-            Long childUserId
-    ) {
+        skillScoringService.recordActivity(
+                child,
+                SkillType.BUDGETING,
+                scores.budgetingScore()
+        );
 
-        ChildProfile child =
-                getChildByUserId(
-                        childUserId
+        skillScoringService.recordActivity(
+                child,
+                SkillType.RISK_MANAGEMENT,
+                scores.riskManagementScore()
+        );
+
+        skillScoringService.recordActivity(
+                child,
+                SkillType.INVESTMENT,
+                scores.investmentScore()
+        );
+
+        skillScoringService.recordActivity(
+                child,
+                SkillType.DECISION_MAKING,
+                scores.decisionMakingScore()
+        );
+
+        // -------------------------------------------------
+        // Select event
+        // -------------------------------------------------
+
+        SimulationEventType event =
+                selectRandomEvent();
+
+        /*
+         * Spending is treated as consumed money.
+         *
+         * Example:
+         *
+         * Start:     1000 AZN
+         * Spending:   100 AZN
+         *
+         * Portfolio before event = 900 AZN
+         */
+        BigDecimal portfolioValueBeforeEvent =
+                money(
+                        STARTING_AMOUNT.subtract(
+                                request.spending()
+                        )
                 );
 
-        return getDecisionHistory(
-                child.getId()
+        BigDecimal eventDelta =
+                calculateEventDelta(
+                        event,
+                        request,
+                        portfolioValueBeforeEvent
+                );
+
+        BigDecimal endingAmount =
+                money(
+                        portfolioValueBeforeEvent
+                                .add(eventDelta)
+                );
+
+        BigDecimal netChange =
+                money(
+                        endingAmount.subtract(
+                                STARTING_AMOUNT
+                        )
+                );
+
+        // -------------------------------------------------
+        // XP
+        // -------------------------------------------------
+
+        int xpEarned = 0;
+
+        if (firstRun) {
+            xpEarned =
+                    scoringService
+                            .awardSimulationCompletionXp(
+                                    child
+                            );
+        }
+
+        // -------------------------------------------------
+        // Persist run
+        // -------------------------------------------------
+
+        SimulationRun run =
+                SimulationRun.builder()
+                        .child(child)
+
+                        .startingAmount(
+                                STARTING_AMOUNT
+                        )
+
+                        .cashAmount(
+                                money(request.cash())
+                        )
+
+                        .savingAmount(
+                                money(request.saving())
+                        )
+
+                        .depositAmount(
+                                money(request.deposit())
+                        )
+
+                        .bondAmount(
+                                money(request.bond())
+                        )
+
+                        .investmentAmount(
+                                money(request.investment())
+                        )
+
+                        .spendingAmount(
+                                money(request.spending())
+                        )
+
+                        .businessAmount(
+                                money(request.business())
+                        )
+
+                        .portfolioValueBeforeEvent(
+                                portfolioValueBeforeEvent
+                        )
+
+                        .eventType(
+                                event
+                        )
+
+                        .eventDelta(
+                                eventDelta
+                        )
+
+                        .endingAmount(
+                                endingAmount
+                        )
+
+                        .netChange(
+                                netChange
+                        )
+
+                        .savingScore(
+                                scores.savingScore()
+                        )
+
+                        .budgetingScore(
+                                scores.budgetingScore()
+                        )
+
+                        .riskManagementScore(
+                                scores.riskManagementScore()
+                        )
+
+                        .investmentScore(
+                                scores.investmentScore()
+                        )
+
+                        .decisionMakingScore(
+                                scores.decisionMakingScore()
+                        )
+
+                        .xpEarned(
+                                xpEarned
+                        )
+
+                        .build();
+
+        SimulationRun savedRun =
+                mainSimulationRunRepository
+                        .save(run);
+
+        return toResponse(
+                savedRun
         );
     }
 
@@ -163,181 +309,25 @@ public class SimulationService {
     ) {
 
         ChildProfile child =
-                getChildByUserId(
-                        childUserId
-                );
+                childProfileRepository
+                        .findByUser_Id(childUserId)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Child profile not found for authenticated user"
+                                )
+                        );
 
         return getRunHistory(
                 child.getId()
         );
     }
 
-    // =========================
-    // Shared business logic
-    // =========================
+    // =====================================================
+    // Parent
+    // =====================================================
 
-    private SimulationDecisionResponse processDecision(
-            ChildProfile child,
-            String scenarioCode,
-            SimulationDecisionRequest request
-    ) {
-
-        SimulationScenario scenario =
-                simulationScenarioRepository
-                        .findByCodeAndActiveTrue(
-                                scenarioCode
-                        )
-                        .orElseThrow(() ->
-                                new ResourceNotFoundException(
-                                        "Simulation scenario not found"
-                                )
-                        );
-
-        SimulationOption selectedOption =
-                simulationOptionRepository
-                        .findByScenario_IdAndCodeAndActiveTrue(
-                                scenario.getId(),
-                                request.optionCode()
-                        )
-                        .orElseThrow(() ->
-                                new ResourceNotFoundException(
-                                        "Simulation option not found"
-                                )
-                        );
-
-        SimulationRun run =
-                simulationRunRepository.save(
-                        SimulationRun.builder()
-                                .child(child)
-                                .scenario(scenario)
-                                .status(
-                                        SimulationRunStatus.IN_PROGRESS
-                                )
-                                .build()
-                );
-
-        BigDecimal amountSpent =
-                selectedOption.getCost();
-
-        Long walletTransactionId = null;
-
-        if (amountSpent.signum() > 0) {
-
-            WalletTransactionResponse walletTransaction =
-                    walletService.debitForSimulation(
-                            child.getId(),
-                            amountSpent,
-                            "Simulation "
-                                    + scenario.getCode()
-                                    + ": "
-                                    + selectedOption.getCode()
-                    );
-
-            walletTransactionId =
-                    walletTransaction.id();
-        }
-
-        int xpEarned =
-                scoringService
-                        .awardScenarioCompletionXp(
-                                child
-                        );
-
-        SimulationDecision decision =
-                SimulationDecision.builder()
-                        .child(child)
-                        .run(run)
-                        .option(selectedOption)
-                        .scenarioCode(
-                                scenario.getCode()
-                        )
-                        .optionCode(
-                                selectedOption.getCode()
-                        )
-                        .amountSpent(
-                                amountSpent
-                        )
-                        .walletTransactionId(
-                                walletTransactionId
-                        )
-                        .xpEarned(
-                                xpEarned
-                        )
-                        .build();
-
-        SimulationDecision savedDecision =
-                simulationDecisionRepository
-                        .save(decision);
-
-        run.complete();
-
-        return toDecisionResponse(
-                savedDecision
-        );
-    }
-
-    private List<SimulationScenarioResponse> getActiveScenarios() {
-
-        return simulationScenarioRepository
-                .findAllByActiveTrueOrderByDisplayOrderAsc()
-                .stream()
-                .map(this::toScenarioResponse)
-                .toList();
-    }
-
-    private List<SimulationDecisionResponse> getDecisionHistory(
-            Long childProfileId
-    ) {
-
-        return simulationDecisionRepository
-                .findAllByChild_IdOrderByCreatedAtDescIdDesc(
-                        childProfileId
-                )
-                .stream()
-                .map(this::toDecisionResponse)
-                .toList();
-    }
-
-    private List<SimulationRunResponse> getRunHistory(
-            Long childProfileId
-    ) {
-
-        return simulationRunRepository
-                .findAllByChild_IdOrderByStartedAtDescIdDesc(
-                        childProfileId
-                )
-                .stream()
-                .map(this::toRunResponse)
-                .toList();
-    }
-
-    private ChildProfile getChildByIdForParent(
-            Long childProfileId
-    ) {
-
-        return childProfileRepository
-                .findById(childProfileId)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Child not found for authenticated parent"
-                        )
-                );
-    }
-
-    private ChildProfile getChildByUserId(
-            Long childUserId
-    ) {
-
-        return childProfileRepository
-                .findByUser_Id(childUserId)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Child profile not found for authenticated user"
-                        )
-                );
-    }
-
-    private void verifyChildBelongsToParent(
+    @Transactional(readOnly = true)
+    public List<SimulationRunResponse> getRunsForParent(
             Long parentUserId,
             Long childProfileId
     ) {
@@ -354,66 +344,147 @@ public class SimulationService {
                     "Child not found for authenticated parent"
             );
         }
+
+        return getRunHistory(
+                childProfileId
+        );
     }
 
-    // =========================
+    // =====================================================
+    // Shared history
+    // =====================================================
+
+    private List<SimulationRunResponse> getRunHistory(
+            Long childProfileId
+    ) {
+
+        return mainSimulationRunRepository
+                .findAllByChild_IdOrderByCreatedAtDescIdDesc(
+                        childProfileId
+                )
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    // =====================================================
+    // Event selection
+    // =====================================================
+
+    private SimulationEventType selectRandomEvent() {
+
+        SimulationEventType[] values =
+                SimulationEventType.values();
+
+        int index =
+                ThreadLocalRandom
+                        .current()
+                        .nextInt(
+                                values.length
+                        );
+
+        return values[index];
+    }
+
+    // =====================================================
+    // Event calculations
+    // =====================================================
+
+    private BigDecimal calculateEventDelta(
+            SimulationEventType event,
+            SimulationRequest request,
+            BigDecimal portfolioValueBeforeEvent
+    ) {
+
+        BigDecimal delta =
+                switch (event) {
+
+                    case STOCK_MARKET_DROP ->
+                            request.investment()
+                                    .multiply(
+                                            STOCK_DROP_RATE
+                                    )
+                                    .negate();
+
+                    case UNEXPECTED_EXPENSE ->
+                            portfolioValueBeforeEvent
+                                    .min(
+                                            UNEXPECTED_EXPENSE
+                                    )
+                                    .negate();
+
+                    case DEPOSIT_INTEREST ->
+                            request.deposit()
+                                    .multiply(
+                                            DEPOSIT_RATE
+                                    );
+
+                    case BUSINESS_PROFIT ->
+                            request.business()
+                                    .multiply(
+                                            BUSINESS_RATE
+                                    );
+                };
+
+        return money(
+                delta
+        );
+    }
+
+    // =====================================================
+    // Money normalization
+    // =====================================================
+
+    private BigDecimal money(
+            BigDecimal value
+    ) {
+
+        return value.setScale(
+                2,
+                RoundingMode.HALF_UP
+        );
+    }
+
+    // =====================================================
     // Mapping
-    // =========================
+    // =====================================================
 
-    private SimulationScenarioResponse toScenarioResponse(
-            SimulationScenario scenario
-    ) {
-
-        List<SimulationOptionResponse> options =
-                simulationOptionRepository
-                        .findAllByScenario_IdAndActiveTrueOrderByDisplayOrderAsc(
-                                scenario.getId()
-                        )
-                        .stream()
-                        .map(option ->
-                                new SimulationOptionResponse(
-                                        option.getCode(),
-                                        option.getTitle(),
-                                        option.getDescription(),
-                                        option.getCost()
-                                )
-                        )
-                        .toList();
-
-        return new SimulationScenarioResponse(
-                scenario.getCode(),
-                scenario.getTitle(),
-                scenario.getDescription(),
-                options
-        );
-    }
-
-    private SimulationDecisionResponse toDecisionResponse(
-            SimulationDecision decision
-    ) {
-
-        return new SimulationDecisionResponse(
-                decision.getId(),
-                decision.getRun().getId(),
-                decision.getScenarioCode(),
-                decision.getOptionCode(),
-                decision.getAmountSpent(),
-                decision.getWalletTransactionId(),
-                decision.getXpEarned(),
-                decision.getCreatedAt()
-        );
-    }
-
-    private SimulationRunResponse toRunResponse(
+    private SimulationRunResponse toResponse(
             SimulationRun run
     ) {
 
         return new SimulationRunResponse(
                 run.getId(),
-                run.getScenario().getCode(),
-                run.getStatus(),
-                run.getStartedAt(),
-                run.getCompletedAt()
+
+                run.getStartingAmount(),
+
+                run.getCashAmount(),
+                run.getSavingAmount(),
+                run.getDepositAmount(),
+                run.getBondAmount(),
+                run.getInvestmentAmount(),
+                run.getSpendingAmount(),
+                run.getBusinessAmount(),
+
+                run.getPortfolioValueBeforeEvent(),
+
+                run.getEventType(),
+                run.getEventType().getTitle(),
+                run.getEventType().getDescription(),
+
+                run.getEventDelta(),
+                run.getEndingAmount(),
+                run.getNetChange(),
+
+                run.getSavingScore(),
+                run.getBudgetingScore(),
+                run.getRiskManagementScore(),
+                run.getInvestmentScore(),
+                run.getDecisionMakingScore(),
+
+                run.getXpEarned(),
+
+                run.getCreatedAt()
         );
     }
 }

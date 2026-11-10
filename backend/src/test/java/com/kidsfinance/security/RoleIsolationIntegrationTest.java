@@ -34,7 +34,9 @@ class RoleIsolationIntegrationTest {
     @Container
     @ServiceConnection
     static PostgreSQLContainer postgres =
-            new PostgreSQLContainer("postgres:17-alpine");
+            new PostgreSQLContainer(
+                    "postgres:17-alpine"
+            );
 
     @Autowired
     private MockMvc mockMvc;
@@ -84,31 +86,43 @@ class RoleIsolationIntegrationTest {
                 "Bearer " + login.accessToken();
 
         mockMvc.perform(
-                        get("/api/parents/me/children")
+                        get(
+                                "/api/parents/me/children"
+                        )
                                 .header(
                                         "Authorization",
                                         authorization
                                 )
                 )
-                .andExpect(status().isOk());
+                .andExpect(
+                        status().isOk()
+                );
 
         mockMvc.perform(
-                        get("/api/children/me")
+                        get(
+                                "/api/children/me"
+                        )
                                 .header(
                                         "Authorization",
                                         authorization
                                 )
                 )
-                .andExpect(status().isForbidden());
+                .andExpect(
+                        status().isForbidden()
+                );
 
         mockMvc.perform(
-                        get("/api/children/me/simulations")
+                        get(
+                                "/api/children/me/simulations/runs"
+                        )
                                 .header(
                                         "Authorization",
                                         authorization
                                 )
                 )
-                .andExpect(status().isForbidden());
+                .andExpect(
+                        status().isForbidden()
+                );
     }
 
     @Test
@@ -148,53 +162,99 @@ class RoleIsolationIntegrationTest {
                 "Bearer " + login.accessToken();
 
         mockMvc.perform(
-                        get("/api/children/me")
+                        get(
+                                "/api/children/me"
+                        )
                                 .header(
                                         "Authorization",
                                         authorization
                                 )
                 )
-                .andExpect(status().isOk());
+                .andExpect(
+                        status().isOk()
+                );
 
         mockMvc.perform(
-                        get("/api/children/me/wallet/transactions")
+                        get(
+                                "/api/children/me/wallet"
+                        )
                                 .header(
                                         "Authorization",
                                         authorization
                                 )
                 )
-                .andExpect(status().isOk());
+                .andExpect(
+                        status().isOk()
+                );
 
         mockMvc.perform(
-                        get("/api/children/me/progress")
+                        get(
+                                "/api/children/me/wallet/transactions"
+                        )
                                 .header(
                                         "Authorization",
                                         authorization
                                 )
                 )
-                .andExpect(status().isOk());
+                .andExpect(
+                        status().isOk()
+                );
 
         mockMvc.perform(
-                        get("/api/children/me/simulations")
+                        get(
+                                "/api/children/me/progress"
+                        )
                                 .header(
                                         "Authorization",
                                         authorization
                                 )
                 )
-                .andExpect(status().isOk());
+                .andExpect(
+                        status().isOk()
+                );
 
         mockMvc.perform(
-                        get("/api/parents/me/children")
+                        get(
+                                "/api/children/me/challenges"
+                        )
                                 .header(
                                         "Authorization",
                                         authorization
                                 )
                 )
-                .andExpect(status().isForbidden());
+                .andExpect(
+                        status().isOk()
+                );
+
+        mockMvc.perform(
+                        get(
+                                "/api/children/me/simulations/runs"
+                        )
+                                .header(
+                                        "Authorization",
+                                        authorization
+                                )
+                )
+                .andExpect(
+                        status().isOk()
+                );
+
+        mockMvc.perform(
+                        get(
+                                "/api/parents/me/children"
+                        )
+                                .header(
+                                        "Authorization",
+                                        authorization
+                                )
+                )
+                .andExpect(
+                        status().isForbidden()
+                );
     }
 
     @Test
-    void childTokenShouldBeAbleToSubmitSimulationDecision()
+    void childTokenShouldBeAbleToRunMainSimulation()
             throws Exception {
 
         ParentResponse parent =
@@ -231,8 +291,7 @@ class RoleIsolationIntegrationTest {
 
         mockMvc.perform(
                         post(
-                                "/api/children/me/simulations/"
-                                        + "SAVE_OR_SPEND_01/decisions"
+                                "/api/children/me/simulations/runs"
                         )
                                 .header(
                                         "Authorization",
@@ -244,30 +303,85 @@ class RoleIsolationIntegrationTest {
                                 .content(
                                         """
                                         {
-                                          "optionCode": "KEEP_SAVINGS"
+                                          "cash": 100,
+                                          "saving": 200,
+                                          "deposit": 200,
+                                          "bond": 100,
+                                          "investment": 150,
+                                          "spending": 100,
+                                          "business": 150
                                         }
                                         """
                                 )
                 )
-                .andExpect(status().isCreated());
+                .andExpect(
+                        status().isCreated()
+                );
 
         mockMvc.perform(
-                        get("/api/children/me/simulations/decisions")
+                        get(
+                                "/api/children/me/simulations/runs"
+                        )
                                 .header(
                                         "Authorization",
                                         authorization
                                 )
                 )
-                .andExpect(status().isOk());
+                .andExpect(
+                        status().isOk()
+                );
+    }
+
+    @Test
+    void parentTokenShouldBeAbleToViewChildMainSimulationHistory()
+            throws Exception {
+
+        ParentResponse parent =
+                parentService.createParent(
+                        new CreateParentRequest(
+                                "role_parent_four",
+                                "Password123!",
+                                "Role Parent Four",
+                                "role.parent.four@example.com"
+                        )
+                );
+
+        ChildResponse child =
+                childService.createChildForParent(
+                        parent.userId(),
+                        new CreateChildRequest(
+                                "role_child_four",
+                                "Password123!",
+                                "Role Child Four",
+                                (short) 12
+                        )
+                );
+
+        LoginResponse parentLogin =
+                authService.login(
+                        new LoginRequest(
+                                "role_parent_four",
+                                "Password123!"
+                        )
+                );
+
+        String parentAuthorization =
+                "Bearer " + parentLogin.accessToken();
 
         mockMvc.perform(
-                        get("/api/children/me/simulations/runs")
+                        get(
+                                "/api/parents/me/children/"
+                                        + child.id()
+                                        + "/simulations/runs"
+                        )
                                 .header(
                                         "Authorization",
-                                        authorization
+                                        parentAuthorization
                                 )
                 )
-                .andExpect(status().isOk());
+                .andExpect(
+                        status().isOk()
+                );
     }
 
     @Test
@@ -275,13 +389,30 @@ class RoleIsolationIntegrationTest {
             throws Exception {
 
         mockMvc.perform(
-                        get("/api/children/me")
+                        get(
+                                "/api/children/me"
+                        )
                 )
-                .andExpect(status().isUnauthorized());
+                .andExpect(
+                        status().isUnauthorized()
+                );
 
         mockMvc.perform(
-                        get("/api/parents/me/children")
+                        get(
+                                "/api/parents/me/children"
+                        )
                 )
-                .andExpect(status().isUnauthorized());
+                .andExpect(
+                        status().isUnauthorized()
+                );
+
+        mockMvc.perform(
+                        get(
+                                "/api/children/me/simulations/runs"
+                        )
+                )
+                .andExpect(
+                        status().isUnauthorized()
+                );
     }
 }

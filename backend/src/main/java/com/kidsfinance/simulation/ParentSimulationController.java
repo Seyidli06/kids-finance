@@ -1,6 +1,6 @@
-package com.kidsfinance.simulation.main;
+package com.kidsfinance.simulation;
 
-import com.kidsfinance.simulation.main.dto.response.MainSimulationRunResponse;
+import com.kidsfinance.simulation.dto.response.SimulationRunResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -10,15 +10,15 @@ import java.util.List;
 
 @RestController
 @RequestMapping(
-        "/api/parents/me/children/{childId}/simulations/main/runs"
+        "/api/parents/me/children/{childId}/simulations/runs"
 )
 @RequiredArgsConstructor
-public class ParentMainSimulationController {
+public class ParentSimulationController {
 
-    private final MainSimulationService mainSimulationService;
+    private final SimulationService mainSimulationService;
 
     @GetMapping
-    public List<MainSimulationRunResponse> getRuns(
+    public List<SimulationRunResponse> getRuns(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable Long childId
     ) {

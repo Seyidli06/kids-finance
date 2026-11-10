@@ -1,6 +1,6 @@
-package com.kidsfinance.simulation.main;
+package com.kidsfinance.simulation;
 
-public record MainSimulationScoreResult(
+public record SimulationScoreResult(
         int savingScore,
         int budgetingScore,
         int riskManagementScore,

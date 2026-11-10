@@ -21,14 +21,21 @@ public class SecurityConfig {
 
         http
                 .csrf(AbstractHttpConfigurer::disable)
+
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(
                                 SessionCreationPolicy.STATELESS
                         )
                 )
+
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
+
                 .authorizeHttpRequests(auth -> auth
+
+                        // =========================================
+                        // Public endpoints
+                        // =========================================
 
                         .requestMatchers(
                                 "/actuator/health",
@@ -45,6 +52,10 @@ public class SecurityConfig {
                         ).permitAll()
 
 
+                        // =========================================
+                        // Parent - children
+                        // =========================================
+
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/parents/me/children"
@@ -55,45 +66,45 @@ public class SecurityConfig {
                                 "/api/parents/me/children"
                         ).hasRole("PARENT")
 
-                        // Parent: child wallet balance
+
+                        // =========================================
+                        // Parent - wallet
+                        // =========================================
+
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/parents/me/children/*/wallet"
                         ).hasRole("PARENT")
 
-                        // Parent: wallet transaction history
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/parents/me/children/*/wallet/transactions"
                         ).hasRole("PARENT")
 
-                        // Parent: add virtual money
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/parents/me/children/*/wallet/credit"
                         ).hasRole("PARENT")
 
-                        // Parent: spend virtual money
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/parents/me/children/*/wallet/debit"
                         ).hasRole("PARENT")
 
-                        // Parent: view child simulation scenarios
-                        .requestMatchers(
-                                HttpMethod.GET,
-                                "/api/parents/me/children/*/simulations"
-                        ).hasRole("PARENT")
 
-                        .requestMatchers(
-                                HttpMethod.POST,
-                                "/api/parents/me/children/*/simulations/*/decisions"
-                        ).hasRole("PARENT")
+                        // =========================================
+                        // Parent - progress
+                        // =========================================
 
                         .requestMatchers(
                                 HttpMethod.GET,
-                                "/api/parents/me/children/*/simulations/decisions"
+                                "/api/parents/me/children/*/progress"
                         ).hasRole("PARENT")
+
+
+                        // =========================================
+                        // Parent - main simulation history
+                        // =========================================
 
                         .requestMatchers(
                                 HttpMethod.GET,
@@ -101,10 +112,9 @@ public class SecurityConfig {
                         ).hasRole("PARENT")
 
 
-                        .requestMatchers(
-                                HttpMethod.GET,
-                                "/api/parents/me/children/*/progress"
-                        ).hasRole("PARENT")
+                        // =========================================
+                        // Child - profile / wallet / progress
+                        // =========================================
 
                         .requestMatchers(
                                 HttpMethod.GET,
@@ -114,18 +124,10 @@ public class SecurityConfig {
                                 "/api/children/me/progress"
                         ).hasRole("CHILD")
 
-                        .requestMatchers(
-                                HttpMethod.GET,
-                                "/api/children/me/simulations",
-                                "/api/children/me/simulations/decisions",
-                                "/api/children/me/simulations/runs"
-                        ).hasRole("CHILD")
 
-                        .requestMatchers(
-                                HttpMethod.POST,
-                                "/api/children/me/simulations/*/decisions"
-                        ).hasRole("CHILD")
-
+                        // =========================================
+                        // Child - challenges / practice
+                        // =========================================
 
                         .requestMatchers(
                                 HttpMethod.GET,
@@ -138,24 +140,29 @@ public class SecurityConfig {
                                 "/api/children/me/challenges/*/answers"
                         ).hasRole("CHILD")
 
+
+                        // =========================================
+                        // Child - main simulation
+                        // =========================================
+
                         .requestMatchers(
                                 HttpMethod.GET,
-                                "/api/children/me/simulations/main/runs"
+                                "/api/children/me/simulations/runs"
                         ).hasRole("CHILD")
 
                         .requestMatchers(
                                 HttpMethod.POST,
-                                "/api/children/me/simulations/main/runs"
+                                "/api/children/me/simulations/runs"
                         ).hasRole("CHILD")
 
-                        .requestMatchers(
-                                HttpMethod.GET,
-                                "/api/parents/me/children/*/simulations/main/runs"
-                        ).hasRole("PARENT")
 
-                        // Everything else remains blocked
+                        // =========================================
+                        // Everything else blocked
+                        // =========================================
+
                         .anyRequest().denyAll()
                 )
+
                 .oauth2ResourceServer(oauth2 ->
                         oauth2.jwt(jwt ->
                                 jwt.jwtAuthenticationConverter(
@@ -173,8 +180,13 @@ public class SecurityConfig {
         JwtGrantedAuthoritiesConverter authoritiesConverter =
                 new JwtGrantedAuthoritiesConverter();
 
-        authoritiesConverter.setAuthoritiesClaimName("role");
-        authoritiesConverter.setAuthorityPrefix("ROLE_");
+        authoritiesConverter.setAuthoritiesClaimName(
+                "role"
+        );
+
+        authoritiesConverter.setAuthorityPrefix(
+                "ROLE_"
+        );
 
         JwtAuthenticationConverter authenticationConverter =
                 new JwtAuthenticationConverter();
@@ -185,6 +197,4 @@ public class SecurityConfig {
 
         return authenticationConverter;
     }
-
-
 }

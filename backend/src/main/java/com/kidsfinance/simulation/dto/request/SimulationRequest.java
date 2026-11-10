@@ -1,4 +1,4 @@
-package com.kidsfinance.simulation.main.dto.request;
+package com.kidsfinance.simulation.dto.request;
 
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.DecimalMax;
@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
 
-public record MainSimulationRequest(
+public record SimulationRequest(
 
         @NotNull
         @DecimalMin("0.00")

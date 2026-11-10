@@ -7,8 +7,12 @@ import java.util.List;
 public interface SimulationRunRepository
         extends JpaRepository<SimulationRun, Long> {
 
+    boolean existsByChild_Id(
+            Long childProfileId
+    );
+
     List<SimulationRun>
-    findAllByChild_IdOrderByStartedAtDescIdDesc(
+    findAllByChild_IdOrderByCreatedAtDescIdDesc(
             Long childProfileId
     );
 }

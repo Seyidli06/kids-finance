@@ -4,6 +4,7 @@ import com.kidsfinance.child.ChildProfile;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
 @Entity
@@ -19,42 +20,125 @@ public class SimulationRun {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @ManyToOne(
+            fetch = FetchType.LAZY,
+            optional = false
+    )
     @JoinColumn(
             name = "child_profile_id",
             nullable = false,
             foreignKey = @ForeignKey(
-                    name = "fk_simulation_runs_child"
+                    name = "fk_main_simulation_runs_child"
             )
     )
     private ChildProfile child;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(
-            name = "scenario_id",
+    @Column(
+            name = "starting_amount",
             nullable = false,
-            foreignKey = @ForeignKey(
-                    name = "fk_simulation_runs_scenario"
-            )
+            precision = 19,
+            scale = 2
     )
-    private SimulationScenario scenario;
+    private BigDecimal startingAmount;
+
+    @Column(name = "cash_amount", nullable = false, precision = 19, scale = 2)
+    private BigDecimal cashAmount;
+
+    @Column(name = "saving_amount", nullable = false, precision = 19, scale = 2)
+    private BigDecimal savingAmount;
+
+    @Column(name = "deposit_amount", nullable = false, precision = 19, scale = 2)
+    private BigDecimal depositAmount;
+
+    @Column(name = "bond_amount", nullable = false, precision = 19, scale = 2)
+    private BigDecimal bondAmount;
+
+    @Column(name = "investment_amount", nullable = false, precision = 19, scale = 2)
+    private BigDecimal investmentAmount;
+
+    @Column(name = "spending_amount", nullable = false, precision = 19, scale = 2)
+    private BigDecimal spendingAmount;
+
+    @Column(name = "business_amount", nullable = false, precision = 19, scale = 2)
+    private BigDecimal businessAmount;
+
+    @Column(
+            name = "portfolio_value_before_event",
+            nullable = false,
+            precision = 19,
+            scale = 2
+    )
+    private BigDecimal portfolioValueBeforeEvent;
 
     @Enumerated(EnumType.STRING)
     @Column(
-            name = "status",
+            name = "event_type",
             nullable = false,
-            length = 20
+            length = 40
     )
-    private SimulationRunStatus status;
+    private SimulationEventType eventType;
 
     @Column(
-            name = "started_at",
+            name = "event_delta",
+            nullable = false,
+            precision = 19,
+            scale = 2
+    )
+    private BigDecimal eventDelta;
+
+    @Column(
+            name = "ending_amount",
+            nullable = false,
+            precision = 19,
+            scale = 2
+    )
+    private BigDecimal endingAmount;
+
+    @Column(
+            name = "net_change",
+            nullable = false,
+            precision = 19,
+            scale = 2
+    )
+    private BigDecimal netChange;
+
+    @Column(
+            name = "saving_score",
             nullable = false
     )
-    private OffsetDateTime startedAt;
+    private Integer savingScore;
 
-    @Column(name = "completed_at")
-    private OffsetDateTime completedAt;
+    @Column(
+            name = "budgeting_score",
+            nullable = false
+    )
+    private Integer budgetingScore;
+
+    @Column(
+            name = "risk_management_score",
+            nullable = false
+    )
+    private Integer riskManagementScore;
+
+    @Column(
+            name = "investment_score",
+            nullable = false
+    )
+    private Integer investmentScore;
+
+    @Column(
+            name = "decision_making_score",
+            nullable = false
+    )
+    private Integer decisionMakingScore;
+
+    @Column(
+            name = "xp_earned",
+            nullable = false
+    )
+
+
+    private Integer xpEarned;
 
     @Column(
             name = "created_at",
@@ -63,41 +147,10 @@ public class SimulationRun {
     )
     private OffsetDateTime createdAt;
 
-    @Column(
-            name = "updated_at",
-            nullable = false
-    )
-    private OffsetDateTime updatedAt;
-
     @PrePersist
     void onCreate() {
-
-        OffsetDateTime now = OffsetDateTime.now();
-
-        if (status == null) {
-            status = SimulationRunStatus.IN_PROGRESS;
-        }
-
-        if (startedAt == null) {
-            startedAt = now;
-        }
-
         if (createdAt == null) {
-            createdAt = now;
+            createdAt = OffsetDateTime.now();
         }
-
-        if (updatedAt == null) {
-            updatedAt = now;
-        }
-    }
-
-    @PreUpdate
-    void onUpdate() {
-        updatedAt = OffsetDateTime.now();
-    }
-
-    public void complete() {
-        status = SimulationRunStatus.COMPLETED;
-        completedAt = OffsetDateTime.now();
     }
 }
