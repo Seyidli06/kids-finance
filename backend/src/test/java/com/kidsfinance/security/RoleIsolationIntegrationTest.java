@@ -51,243 +51,261 @@ class RoleIsolationIntegrationTest {
     private AuthService authService;
 
     @Test
-    void parentTokenShouldAccessParentApiButNotChildApi()
+    void parentTokenShouldAccessParentApisButNotChildApis()
             throws Exception {
 
         ParentResponse parent =
-                parentService.createParent(
-                        new CreateParentRequest(
-                                "role_parent_one",
-                                "Password123!",
-                                "Role Parent One",
-                                "role.parent.one@example.com"
-                        )
+                createParent(
+                        "security_parent_one",
+                        "security.parent.one@example.com"
                 );
 
-        childService.createChildForParent(
-                parent.userId(),
-                new CreateChildRequest(
-                        "role_child_one",
-                        "Password123!",
-                        "Role Child One",
-                        (short) 12
-                )
+        ChildResponse child =
+                createChild(
+                        parent,
+                        "security_child_one"
+                );
+
+        String authorization =
+                authorization(
+                        parent.username(),
+                        "Password123!"
+                );
+
+        // Parent APIs
+
+        expectOk(
+                "/api/parents/me/children",
+                authorization
         );
 
-        LoginResponse login =
-                authService.login(
-                        new LoginRequest(
-                                "role_parent_one",
-                                "Password123!"
-                        )
-                );
+        expectOk(
+                "/api/parents/me/children/"
+                        + child.id()
+                        + "/wallet",
+                authorization
+        );
 
-        String authorization =
-                "Bearer " + login.accessToken();
+        expectOk(
+                "/api/parents/me/children/"
+                        + child.id()
+                        + "/wallet/transactions",
+                authorization
+        );
 
-        mockMvc.perform(
-                        get(
-                                "/api/parents/me/children"
-                        )
-                                .header(
-                                        "Authorization",
-                                        authorization
-                                )
-                )
-                .andExpect(
-                        status().isOk()
-                );
+        expectOk(
+                "/api/parents/me/children/"
+                        + child.id()
+                        + "/progress",
+                authorization
+        );
 
-        mockMvc.perform(
-                        get(
-                                "/api/children/me"
-                        )
-                                .header(
-                                        "Authorization",
-                                        authorization
-                                )
-                )
-                .andExpect(
-                        status().isForbidden()
-                );
+        expectOk(
+                "/api/parents/me/children/"
+                        + child.id()
+                        + "/simulations/runs",
+                authorization
+        );
 
-        mockMvc.perform(
-                        get(
-                                "/api/children/me/simulations/runs"
-                        )
-                                .header(
-                                        "Authorization",
-                                        authorization
-                                )
-                )
-                .andExpect(
-                        status().isForbidden()
-                );
+        expectOk(
+                "/api/parents/me/children/"
+                        + child.id()
+                        + "/achievements",
+                authorization
+        );
+
+        expectOk(
+                "/api/parents/me/children/"
+                        + child.id()
+                        + "/streak",
+                authorization
+        );
+
+        expectOk(
+                "/api/parents/me/children/"
+                        + child.id()
+                        + "/dashboard",
+                authorization
+        );
+
+        expectOk(
+                "/api/parents/me/children/"
+                        + child.id()
+                        + "/reports?period=WEEKLY",
+                authorization
+        );
+
+        expectOk(
+                "/api/parents/me/children/"
+                        + child.id()
+                        + "/reports?period=MONTHLY",
+                authorization
+        );
+
+        // Parent must not access child self-service APIs.
+
+        expectForbidden(
+                "/api/children/me",
+                authorization
+        );
+
+        expectForbidden(
+                "/api/children/me/wallet",
+                authorization
+        );
+
+        expectForbidden(
+                "/api/children/me/progress",
+                authorization
+        );
+
+        expectForbidden(
+                "/api/children/me/challenges",
+                authorization
+        );
+
+        expectForbidden(
+                "/api/children/me/simulations/runs",
+                authorization
+        );
+
+        expectForbidden(
+                "/api/children/me/achievements",
+                authorization
+        );
+
+        expectForbidden(
+                "/api/children/me/streak",
+                authorization
+        );
     }
 
     @Test
-    void childTokenShouldAccessChildApiButNotParentApi()
+    void childTokenShouldAccessChildApisButNotParentApis()
             throws Exception {
 
         ParentResponse parent =
-                parentService.createParent(
-                        new CreateParentRequest(
-                                "role_parent_two",
-                                "Password123!",
-                                "Role Parent Two",
-                                "role.parent.two@example.com"
-                        )
+                createParent(
+                        "security_parent_two",
+                        "security.parent.two@example.com"
                 );
 
         ChildResponse child =
-                childService.createChildForParent(
-                        parent.userId(),
-                        new CreateChildRequest(
-                                "role_child_two",
-                                "Password123!",
-                                "Role Child Two",
-                                (short) 12
-                        )
-                );
-
-        LoginResponse login =
-                authService.login(
-                        new LoginRequest(
-                                child.username(),
-                                "Password123!"
-                        )
+                createChild(
+                        parent,
+                        "security_child_two"
                 );
 
         String authorization =
-                "Bearer " + login.accessToken();
-
-        mockMvc.perform(
-                        get(
-                                "/api/children/me"
-                        )
-                                .header(
-                                        "Authorization",
-                                        authorization
-                                )
-                )
-                .andExpect(
-                        status().isOk()
+                authorization(
+                        child.username(),
+                        "Password123!"
                 );
 
-        mockMvc.perform(
-                        get(
-                                "/api/children/me/wallet"
-                        )
-                                .header(
-                                        "Authorization",
-                                        authorization
-                                )
-                )
-                .andExpect(
-                        status().isOk()
-                );
+        // Child APIs.
 
-        mockMvc.perform(
-                        get(
-                                "/api/children/me/wallet/transactions"
-                        )
-                                .header(
-                                        "Authorization",
-                                        authorization
-                                )
-                )
-                .andExpect(
-                        status().isOk()
-                );
+        expectOk(
+                "/api/children/me",
+                authorization
+        );
 
-        mockMvc.perform(
-                        get(
-                                "/api/children/me/progress"
-                        )
-                                .header(
-                                        "Authorization",
-                                        authorization
-                                )
-                )
-                .andExpect(
-                        status().isOk()
-                );
+        expectOk(
+                "/api/children/me/wallet",
+                authorization
+        );
 
-        mockMvc.perform(
-                        get(
-                                "/api/children/me/challenges"
-                        )
-                                .header(
-                                        "Authorization",
-                                        authorization
-                                )
-                )
-                .andExpect(
-                        status().isOk()
-                );
+        expectOk(
+                "/api/children/me/wallet/transactions",
+                authorization
+        );
 
-        mockMvc.perform(
-                        get(
-                                "/api/children/me/simulations/runs"
-                        )
-                                .header(
-                                        "Authorization",
-                                        authorization
-                                )
-                )
-                .andExpect(
-                        status().isOk()
-                );
+        expectOk(
+                "/api/children/me/progress",
+                authorization
+        );
 
-        mockMvc.perform(
-                        get(
-                                "/api/parents/me/children"
-                        )
-                                .header(
-                                        "Authorization",
-                                        authorization
-                                )
-                )
-                .andExpect(
-                        status().isForbidden()
-                );
+        expectOk(
+                "/api/children/me/challenges",
+                authorization
+        );
+
+        expectOk(
+                "/api/children/me/challenges/attempts",
+                authorization
+        );
+
+        expectOk(
+                "/api/children/me/simulations/runs",
+                authorization
+        );
+
+        expectOk(
+                "/api/children/me/achievements",
+                authorization
+        );
+
+        expectOk(
+                "/api/children/me/streak",
+                authorization
+        );
+
+        // Child must not access parent APIs.
+
+        expectForbidden(
+                "/api/parents/me/children",
+                authorization
+        );
+
+        expectForbidden(
+                "/api/parents/me/children/"
+                        + child.id()
+                        + "/dashboard",
+                authorization
+        );
+
+        expectForbidden(
+                "/api/parents/me/children/"
+                        + child.id()
+                        + "/reports?period=WEEKLY",
+                authorization
+        );
+
+        expectForbidden(
+                "/api/parents/me/children/"
+                        + child.id()
+                        + "/progress",
+                authorization
+        );
+
+        expectForbidden(
+                "/api/parents/me/children/"
+                        + child.id()
+                        + "/achievements",
+                authorization
+        );
     }
 
     @Test
-    void childTokenShouldBeAbleToRunMainSimulation()
+    void childTokenShouldBeAbleToRunSimulation()
             throws Exception {
 
         ParentResponse parent =
-                parentService.createParent(
-                        new CreateParentRequest(
-                                "role_parent_three",
-                                "Password123!",
-                                "Role Parent Three",
-                                "role.parent.three@example.com"
-                        )
+                createParent(
+                        "security_parent_three",
+                        "security.parent.three@example.com"
                 );
 
         ChildResponse child =
-                childService.createChildForParent(
-                        parent.userId(),
-                        new CreateChildRequest(
-                                "role_child_three",
-                                "Password123!",
-                                "Role Child Three",
-                                (short) 12
-                        )
-                );
-
-        LoginResponse login =
-                authService.login(
-                        new LoginRequest(
-                                child.username(),
-                                "Password123!"
-                        )
+                createChild(
+                        parent,
+                        "security_child_three"
                 );
 
         String authorization =
-                "Bearer " + login.accessToken();
+                authorization(
+                        child.username(),
+                        "Password123!"
+                );
 
         mockMvc.perform(
                         post(
@@ -318,70 +336,92 @@ class RoleIsolationIntegrationTest {
                         status().isCreated()
                 );
 
+        expectOk(
+                "/api/children/me/simulations/runs",
+                authorization
+        );
+
+        expectOk(
+                "/api/children/me/progress",
+                authorization
+        );
+
+        expectOk(
+                "/api/children/me/streak",
+                authorization
+        );
+
+        expectOk(
+                "/api/children/me/achievements",
+                authorization
+        );
+    }
+
+    @Test
+    void childTokenShouldBeAbleToSubmitChallengeAnswer()
+            throws Exception {
+
+        ParentResponse parent =
+                createParent(
+                        "security_parent_four",
+                        "security.parent.four@example.com"
+                );
+
+        ChildResponse child =
+                createChild(
+                        parent,
+                        "security_child_four"
+                );
+
+        String authorization =
+                authorization(
+                        child.username(),
+                        "Password123!"
+                );
+
         mockMvc.perform(
-                        get(
-                                "/api/children/me/simulations/runs"
+                        post(
+                                "/api/children/me/challenges/"
+                                        + "SAVING_01/answers"
                         )
                                 .header(
                                         "Authorization",
                                         authorization
                                 )
-                )
-                .andExpect(
-                        status().isOk()
-                );
-    }
-
-    @Test
-    void parentTokenShouldBeAbleToViewChildMainSimulationHistory()
-            throws Exception {
-
-        ParentResponse parent =
-                parentService.createParent(
-                        new CreateParentRequest(
-                                "role_parent_four",
-                                "Password123!",
-                                "Role Parent Four",
-                                "role.parent.four@example.com"
-                        )
-                );
-
-        ChildResponse child =
-                childService.createChildForParent(
-                        parent.userId(),
-                        new CreateChildRequest(
-                                "role_child_four",
-                                "Password123!",
-                                "Role Child Four",
-                                (short) 12
-                        )
-                );
-
-        LoginResponse parentLogin =
-                authService.login(
-                        new LoginRequest(
-                                "role_parent_four",
-                                "Password123!"
-                        )
-                );
-
-        String parentAuthorization =
-                "Bearer " + parentLogin.accessToken();
-
-        mockMvc.perform(
-                        get(
-                                "/api/parents/me/children/"
-                                        + child.id()
-                                        + "/simulations/runs"
-                        )
-                                .header(
-                                        "Authorization",
-                                        parentAuthorization
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(
+                                        """
+                                        {
+                                          "optionCode": "SAVE_FIRST"
+                                        }
+                                        """
                                 )
                 )
                 .andExpect(
-                        status().isOk()
+                        status().isCreated()
                 );
+
+        expectOk(
+                "/api/children/me/challenges/attempts",
+                authorization
+        );
+
+        expectOk(
+                "/api/children/me/progress",
+                authorization
+        );
+
+        expectOk(
+                "/api/children/me/streak",
+                authorization
+        );
+
+        expectOk(
+                "/api/children/me/achievements",
+                authorization
+        );
     }
 
     @Test
@@ -399,7 +439,7 @@ class RoleIsolationIntegrationTest {
 
         mockMvc.perform(
                         get(
-                                "/api/parents/me/children"
+                                "/api/children/me/simulations/runs"
                         )
                 )
                 .andExpect(
@@ -408,11 +448,102 @@ class RoleIsolationIntegrationTest {
 
         mockMvc.perform(
                         get(
-                                "/api/children/me/simulations/runs"
+                                "/api/children/me/achievements"
                         )
                 )
                 .andExpect(
                         status().isUnauthorized()
+                );
+
+        mockMvc.perform(
+                        get(
+                                "/api/parents/me/children"
+                        )
+                )
+                .andExpect(
+                        status().isUnauthorized()
+                );
+    }
+
+    private ParentResponse createParent(
+            String username,
+            String email
+    ) {
+
+        return parentService.createParent(
+                new CreateParentRequest(
+                        username,
+                        "Password123!",
+                        "Security Parent",
+                        email
+                )
+        );
+    }
+
+    private ChildResponse createChild(
+            ParentResponse parent,
+            String username
+    ) {
+
+        return childService.createChildForParent(
+                parent.userId(),
+                new CreateChildRequest(
+                        username,
+                        "Password123!",
+                        "Security Child",
+                        (short) 12
+                )
+        );
+    }
+
+    private String authorization(
+            String username,
+            String password
+    ) {
+
+        LoginResponse login =
+                authService.login(
+                        new LoginRequest(
+                                username,
+                                password
+                        )
+                );
+
+        return "Bearer "
+                + login.accessToken();
+    }
+
+    private void expectOk(
+            String uri,
+            String authorization
+    ) throws Exception {
+
+        mockMvc.perform(
+                        get(uri)
+                                .header(
+                                        "Authorization",
+                                        authorization
+                                )
+                )
+                .andExpect(
+                        status().isOk()
+                );
+    }
+
+    private void expectForbidden(
+            String uri,
+            String authorization
+    ) throws Exception {
+
+        mockMvc.perform(
+                        get(uri)
+                                .header(
+                                        "Authorization",
+                                        authorization
+                                )
+                )
+                .andExpect(
+                        status().isForbidden()
                 );
     }
 }
