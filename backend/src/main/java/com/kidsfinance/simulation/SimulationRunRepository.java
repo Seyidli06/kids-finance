@@ -11,6 +11,10 @@ public interface SimulationRunRepository
             Long childProfileId
     );
 
+    long countByChild_Id(
+            Long childProfileId
+    );
+
     List<SimulationRun>
     findAllByChild_IdOrderByCreatedAtDescIdDesc(
             Long childProfileId

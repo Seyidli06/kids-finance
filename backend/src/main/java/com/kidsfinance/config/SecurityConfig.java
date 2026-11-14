@@ -176,6 +176,11 @@ public class SecurityConfig {
                                 "/api/parents/me/children/*/streak"
                         ).hasRole("PARENT")
 
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/parents/me/children/*/dashboard"
+                        ).hasRole("PARENT")
+
 
                         // =========================================
                         // Everything else blocked
