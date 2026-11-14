@@ -2,6 +2,7 @@ package com.kidsfinance.gamification;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 
 public interface ChildAchievementRepository
@@ -15,5 +16,11 @@ public interface ChildAchievementRepository
     List<ChildAchievement>
     findAllByChild_Id(
             Long childProfileId
+    );
+
+    long countByChild_IdAndEarnedAtGreaterThanEqualAndEarnedAtLessThan(
+            Long childProfileId,
+            OffsetDateTime from,
+            OffsetDateTime to
     );
 }

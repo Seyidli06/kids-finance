@@ -2,6 +2,7 @@ package com.kidsfinance.simulation;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 
 public interface SimulationRunRepository
@@ -18,5 +19,12 @@ public interface SimulationRunRepository
     List<SimulationRun>
     findAllByChild_IdOrderByCreatedAtDescIdDesc(
             Long childProfileId
+    );
+
+    List<SimulationRun>
+    findAllByChild_IdAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtAscIdAsc(
+            Long childProfileId,
+            OffsetDateTime from,
+            OffsetDateTime to
     );
 }
