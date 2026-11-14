@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.kidsfinance.scoring.SkillScoringService;
 import com.kidsfinance.gamification.AchievementService;
 import java.util.List;
+import com.kidsfinance.gamification.StreakService;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +27,7 @@ public class ChallengeService {
     private final ScoringService scoringService;
     private final SkillScoringService skillScoringService;
     private final AchievementService achievementService;
+    private final StreakService streakService;
 
     @Transactional(readOnly = true)
     public List<ChallengeResponse> getChallengesForChild(
@@ -135,6 +137,14 @@ public class ChallengeService {
                         .saveAndFlush(
                                 attempt
                         );
+
+        streakService.recordActivity(
+                child
+        );
+
+        achievementService.evaluateAchievements(
+                child
+        );
 
         achievementService.evaluateAchievements(
                 child

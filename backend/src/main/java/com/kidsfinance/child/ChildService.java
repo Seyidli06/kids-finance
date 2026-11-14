@@ -17,6 +17,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.kidsfinance.scoring.SkillScoringService;
+import com.kidsfinance.gamification.StreakService;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +30,7 @@ public class ChildService {
     private final ParentChildLinkRepository parentChildLinkRepository;
     private final PasswordEncoder passwordEncoder;
     private final WalletService walletService;
+    private final StreakService streakService;
 
     @Transactional
     public ChildResponse createChildForParent(
@@ -81,6 +83,10 @@ public class ChildService {
         walletService.createInitialWallet(savedChild);
 
         skillScoringService.initializeScoresForChild(
+                savedChild
+        );
+
+        streakService.initializeForChild(
                 savedChild
         );
 

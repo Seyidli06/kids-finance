@@ -18,6 +18,7 @@ import java.math.RoundingMode;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import com.kidsfinance.gamification.AchievementService;
+import com.kidsfinance.gamification.StreakService;
 
 @Service
 @RequiredArgsConstructor
@@ -46,6 +47,7 @@ public class SimulationService {
     private final SkillScoringService skillScoringService;
     private final SimulationScoringService mainSimulationScoringService;
     private final AchievementService achievementService;
+    private final StreakService streakService;
 
 
     @Transactional
@@ -69,16 +71,6 @@ public class SimulationService {
                                 )
                         );
 
-        /*
-         * Lock the child row because this operation can update:
-         *
-         * - XP
-         * - level
-         * - skill scores
-         *
-         * Keeping these updates inside the same transaction prevents
-         * concurrent simulation runs from losing progress updates.
-         */
         ChildProfile child =
                 childProfileRepository
                         .findByIdForUpdate(
@@ -90,35 +82,20 @@ public class SimulationService {
                                 )
                         );
 
-        /*
-         * Main simulation can be replayed.
-         *
-         * XP is awarded only on the first completed run so that the child
-         * cannot farm XP by repeatedly submitting the same simulation.
-         */
+
         boolean firstRun =
                 !mainSimulationRunRepository
                         .existsByChild_Id(
                                 child.getId()
                         );
 
-        // -------------------------------------------------
-        // Calculate decision quality
-        // -------------------------------------------------
+
 
         SimulationScoreResult scores =
                 mainSimulationScoringService
                         .calculate(request);
 
-        /*
-         * Every simulation run is an activity, therefore it updates all
-         * five financial skill dimensions.
-         *
-         * These scores describe the quality of the allocation decision.
-         * They are intentionally calculated before / independently of the
-         * random event because market luck must not determine whether the
-         * child's financial decision was good or bad.
-         */
+
         skillScoringService.recordActivity(
                 child,
                 SkillType.SAVING,
@@ -193,9 +170,7 @@ public class SimulationService {
                         )
                 );
 
-        // -------------------------------------------------
-        // XP
-        // -------------------------------------------------
+
 
         int xpEarned = 0;
 
@@ -298,6 +273,14 @@ public class SimulationService {
                         .saveAndFlush(
                                 run
                         );
+
+        streakService.recordActivity(
+                child
+        );
+
+        achievementService.evaluateAchievements(
+                child
+        );
 
         achievementService.evaluateAchievements(
                 child

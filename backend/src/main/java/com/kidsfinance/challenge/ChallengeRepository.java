@@ -13,4 +13,6 @@ public interface ChallengeRepository
 
     Optional<Challenge>
     findByCodeAndActiveTrue(String code);
+
+
 }
