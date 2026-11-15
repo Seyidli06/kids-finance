@@ -2,73 +2,141 @@
 
 Kids Finance is a financial education platform for children aged 10–14.
 
-The project is designed around practical financial learning through virtual money, simulations, decision-making, gamification, and parent-visible progress.
+The MVP teaches financial decision-making through:
 
-> All money used by the application is virtual. No real financial transactions are performed.
+- practice challenges
+- virtual money
+- financial simulations
+- consequences
+- skill scoring
+- XP and levels
+- achievements
+- streaks
+- progress tracking
+- parent dashboards and reports
 
----
-
-## Current Backend Capabilities
-
-The backend currently supports:
-
-- Parent registration and authentication
-- Parent-child relationships
-- Child profile creation
-- Virtual child wallet
-- Wallet credit and debit operations
-- Wallet transaction history
-- Database-driven learning topics
-- Database-driven simulation scenarios and options
-- Replayable simulation runs
-- Simulation decision history
-- XP and level progression
-- Child progress endpoint
-- Parent ownership validation
-- JWT-based authorization
-- Flyway database migrations
-- PostgreSQL Testcontainers integration tests
-- GitHub Actions CI
-- OpenAPI / Swagger UI
+> The application uses virtual money only. No real financial transactions are performed.
 
 ---
 
-## Technology Stack
+# MVP Learning Flow
 
-### Backend
+The core experience is:
+
+```text
+Practice
+  ↓
+Make a financial decision
+  ↓
+See the consequence
+  ↓
+Receive score / XP
+  ↓
+Track progress
+```
+
+The MVP focuses on four financial topics:
+
+- Saving
+- Budgeting
+- Spending Decisions
+- Investing Basics
+
+The skill model tracks:
+
+- Saving
+- Budgeting
+- Risk Management
+- Investment
+- Decision Making
+
+---
+
+# Current Backend Status
+
+The backend MVP is feature-complete.
+
+Implemented:
+
+```text
+Parent registration                ✅
+Parent authentication              ✅
+Child authentication               ✅
+Parent-child relationship          ✅
+Child profiles                     ✅
+
+Virtual wallet                     ✅
+Wallet transaction history         ✅
+Parent credit/debit                ✅
+
+Challenges / practice              ✅
+Challenge attempt history          ✅
+
+1,000 AZN financial simulation     ✅
+Random financial events            ✅
+Simulation history                 ✅
+Simulation consequences            ✅
+
+XP                                 ✅
+Levels                             ✅
+Financial skill scores             ✅
+Overall score                      ✅
+
+Achievements / badges              ✅
+Daily activity streaks             ✅
+
+Child progress                     ✅
+Parent dashboard                   ✅
+Weekly reports                     ✅
+Monthly reports                    ✅
+
+JWT role isolation                 ✅
+Parent ownership validation        ✅
+PostgreSQL / Flyway                ✅
+Testcontainers integration tests   ✅
+GitHub Actions CI                  ✅
+OpenAPI / Swagger                  ✅
+```
+
+---
+
+# Technology Stack
+
+## Backend
 
 - Java 21
 - Spring Boot 4.1.1
 - Spring MVC
 - Spring Data JPA
 - Spring Security
-- JWT authentication
+- JWT
 - Hibernate
 - Flyway
 - PostgreSQL 17
 - Maven
 
-### Testing
+## Testing
 
 - JUnit 5
 - AssertJ
 - Spring Boot Test
+- MockMvc
 - Testcontainers
 - PostgreSQL Testcontainer
 
-### Infrastructure
+## Infrastructure
 
 - Docker Compose
 - GitHub Actions
 
-### API Documentation
+## API Documentation
 
 - OpenAPI
 - Swagger UI
 
 ---
 
-## Project Structure
+# Project Structure
 
 ```text
 kids-finance/
@@ -80,6 +148,20 @@ kids-finance/
 │   ├── src/
 │   │   ├── main/
 │   │   │   ├── java/com/kidsfinance/
+│   │   │   │   ├── auth/
+│   │   │   │   ├── challenge/
+│   │   │   │   ├── child/
+│   │   │   │   ├── dashboard/
+│   │   │   │   ├── family/
+│   │   │   │   ├── gamification/
+│   │   │   │   ├── learning/
+│   │   │   │   ├── parent/
+│   │   │   │   ├── reporting/
+│   │   │   │   ├── scoring/
+│   │   │   │   ├── simulation/
+│   │   │   │   ├── user/
+│   │   │   │   └── wallet/
+│   │   │   │
 │   │   │   └── resources/
 │   │   │       └── db/migration/
 │   │   │
@@ -106,7 +188,7 @@ Install:
 - Docker Desktop
 - Git
 
-The project includes Maven Wrapper, so a separate Maven installation is not required.
+A separate Maven installation is not required because Maven Wrapper is included.
 
 Check Java:
 
@@ -122,30 +204,11 @@ docker version
 
 ---
 
-## 1. Clone the Repository
+# Environment Configuration
 
-```powershell
-git clone https://github.com/Seyidli06/kids-finance.git
-cd kids-finance
-```
+The backend reads its configuration from environment variables.
 
----
-
-## 2. Environment Configuration
-
-The repository contains:
-
-```text
-.env.example
-```
-
-Create your local environment file:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-Example configuration:
+Example:
 
 ```env
 DB_URL=jdbc:postgresql://127.0.0.1:5433/kids_finance
@@ -159,21 +222,28 @@ SERVER_PORT=8081
 
 Do not commit real secrets.
 
-### Generate JWT Secret on PowerShell
+## PowerShell Setup
+
+From the repository root:
 
 ```powershell
+$env:DB_URL="jdbc:postgresql://127.0.0.1:5433/kids_finance"
+$env:DB_USERNAME="kids_finance"
+$env:DB_PASSWORD="kids_finance_dev"
+$env:SERVER_PORT="8081"
+
 $bytes = New-Object byte[] 32
 $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
 $rng.GetBytes($bytes)
-[Convert]::ToBase64String($bytes)
+$env:JWT_SECRET = [Convert]::ToBase64String($bytes)
 $rng.Dispose()
 ```
 
-Copy the generated Base64 value.
+These variables exist only for the current PowerShell session.
 
 ---
 
-## 3. Start PostgreSQL
+# Start PostgreSQL
 
 From the repository root:
 
@@ -181,16 +251,16 @@ From the repository root:
 docker compose up -d
 ```
 
-Check status:
+Check:
 
 ```powershell
 docker compose ps
 ```
 
-The local PostgreSQL instance is exposed on:
+PostgreSQL is exposed at:
 
 ```text
-localhost:5433
+127.0.0.1:5433
 ```
 
 Database:
@@ -201,98 +271,62 @@ kids_finance
 
 ---
 
-## 4. Configure Backend Environment
-
-Before starting the backend in PowerShell:
-
-```powershell
-$env:DB_URL="jdbc:postgresql://127.0.0.1:5433/kids_finance"
-$env:DB_USERNAME="kids_finance"
-$env:DB_PASSWORD="kids_finance_dev"
-$env:SERVER_PORT="8081"
-```
-
-Generate a JWT secret:
-
-```powershell
-$bytes = New-Object byte[] 32
-$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
-$rng.GetBytes($bytes)
-$env:JWT_SECRET = [Convert]::ToBase64String($bytes)
-$rng.Dispose()
-```
-
-Environment variables set this way are valid only for the current PowerShell session.
-
----
-
-## 5. Start the Backend
+# Start Backend
 
 ```powershell
 cd backend
 .\mvnw.cmd spring-boot:run
 ```
 
-The API will start at:
+Default API address:
 
 ```text
 http://localhost:8081
 ```
 
-Flyway automatically applies pending database migrations during startup.
+Flyway automatically applies pending migrations during startup.
 
 ---
 
-# API Documentation
+# Authentication
 
-With the backend running:
-
-### Swagger UI
-
-```text
-http://localhost:8081/swagger-ui.html
-```
-
-### OpenAPI JSON
-
-```text
-http://localhost:8081/v3/api-docs
-```
-
-Protected endpoints use JWT Bearer authentication.
-
-To use Swagger:
-
-1. Create a parent.
-2. Call `POST /api/auth/login`.
-3. Copy `accessToken`.
-4. Click **Authorize** in Swagger.
-5. Paste the token.
-6. Call protected endpoints.
-
----
-
-# Current API
-
-## Authentication
+Both parents and children use:
 
 ```text
 POST /api/auth/login
 ```
 
-Currently parent login is supported.
+The JWT contains the authenticated user ID and role.
 
----
-
-## Parents
+Supported roles:
 
 ```text
-POST /api/parents
-GET  /api/parents/me/children
-POST /api/parents/me/children
+PARENT
+CHILD
+```
+
+Access tokens currently expire after:
+
+```text
+15 minutes
 ```
 
 ---
+
+# Parent API
+
+## Registration
+
+```text
+POST /api/parents
+```
+
+## Children
+
+```text
+GET  /api/parents/me/children
+POST /api/parents/me/children
+```
 
 ## Wallet
 
@@ -304,51 +338,13 @@ POST /api/parents/me/children/{childId}/wallet/credit
 POST /api/parents/me/children/{childId}/wallet/debit
 ```
 
-New child wallets start with:
+Every new child wallet starts with:
 
 ```text
-1000.00 AZN
+1,000.00 AZN
 ```
 
----
-
-## Simulations
-
-```text
-GET /api/parents/me/children/{childId}/simulations
-```
-
-Submit a decision:
-
-```text
-POST /api/parents/me/children/{childId}/simulations/{scenarioCode}/decisions
-```
-
-Decision history:
-
-```text
-GET /api/parents/me/children/{childId}/simulations/decisions
-```
-
-Simulation run history:
-
-```text
-GET /api/parents/me/children/{childId}/simulations/runs
-```
-
-A scenario may be replayed multiple times.
-
-Each play is represented by a separate `SimulationRun`.
-
-Run statuses currently include:
-
-```text
-IN_PROGRESS
-COMPLETED
-ABANDONED
-```
-
----
+All money is virtual.
 
 ## Progress
 
@@ -356,46 +352,323 @@ ABANDONED
 GET /api/parents/me/children/{childId}/progress
 ```
 
-The current scoring model uses:
+## Simulation History
 
 ```text
-10 XP per completed simulation
-100 XP per level
+GET /api/parents/me/children/{childId}/simulations/runs
 ```
+
+## Achievements
+
+```text
+GET /api/parents/me/children/{childId}/achievements
+```
+
+## Streak
+
+```text
+GET /api/parents/me/children/{childId}/streak
+```
+
+## Dashboard
+
+```text
+GET /api/parents/me/children/{childId}/dashboard
+```
+
+The dashboard aggregates:
+
+- XP
+- level
+- overall score
+- five skill scores
+- streak
+- completed challenges
+- completed simulations
+- completed activities
+- earned achievements
+- areas for improvement
+
+## Reports
+
+Weekly:
+
+```text
+GET /api/parents/me/children/{childId}/reports?period=WEEKLY
+```
+
+Monthly:
+
+```text
+GET /api/parents/me/children/{childId}/reports?period=MONTHLY
+```
+
+Reports include:
+
+- period range
+- challenge attempts
+- correct challenge answers
+- simulation runs
+- total activities
+- XP earned
+- active days
+- achievements earned
+- daily activity breakdown
+- current score
+- areas for improvement
 
 ---
 
-# Database Migrations
+# Child API
+
+## Profile
+
+```text
+GET /api/children/me
+```
+
+## Wallet
+
+```text
+GET /api/children/me/wallet
+GET /api/children/me/wallet/transactions
+```
+
+Children can view their wallet but cannot directly credit or debit it.
+
+## Progress
+
+```text
+GET /api/children/me/progress
+```
+
+## Challenges
+
+List:
+
+```text
+GET /api/children/me/challenges
+```
+
+Submit answer:
+
+```text
+POST /api/children/me/challenges/{challengeCode}/answers
+```
+
+Attempt history:
+
+```text
+GET /api/children/me/challenges/attempts
+```
+
+A correct first completion awards XP.
+
+Replay is allowed, but the same challenge cannot be used to farm XP.
+
+## Simulation
+
+Run a simulation:
+
+```text
+POST /api/children/me/simulations/runs
+```
+
+History:
+
+```text
+GET /api/children/me/simulations/runs
+```
+
+Each simulation starts with:
+
+```text
+1,000 virtual AZN
+```
+
+The child allocates the money between:
+
+- cash
+- saving
+- deposit
+- bond
+- investment
+- spending
+- business
+
+The allocation must total exactly:
+
+```text
+1,000.00 AZN
+```
+
+The system then applies a financial event.
+
+Current event examples:
+
+```text
+Stock market -15%
+Unexpected expense -200 AZN
+Deposit interest +6%
+Business profit +20%
+```
+
+The result includes:
+
+- allocation
+- event
+- event impact
+- ending amount
+- net change
+- financial skill scores
+- XP earned
+
+Random market outcomes do not directly determine decision quality.
+
+The decision itself is scored separately.
+
+## Achievements
+
+```text
+GET /api/children/me/achievements
+```
+
+Current achievement examples:
+
+```text
+FIRST_CHALLENGE
+FIRST_SIMULATION
+XP_50
+BALANCED_50
+```
+
+## Daily Streak
+
+```text
+GET /api/children/me/streak
+```
+
+The streak tracks:
+
+- current streak
+- longest streak
+- last activity date
+- whether the child was active today
+
+Challenge attempts and simulation runs count as learning activity.
+
+---
+
+# Financial Skill Scoring
+
+The application tracks five skills:
+
+```text
+SAVING
+BUDGETING
+RISK_MANAGEMENT
+INVESTMENT
+DECISION_MAKING
+```
+
+Each score ranges from:
+
+```text
+0–100
+```
+
+Activity results update skill scores using a running average.
+
+The overall score is calculated from the five skill scores.
+
+The parent dashboard identifies attempted skills below the MVP improvement threshold as areas for improvement.
+
+---
+
+# XP and Levels
+
+Current progression:
+
+```text
+100 XP per level
+```
+
+Challenges may award XP on first correct completion.
+
+The main financial simulation awards XP on first completion.
+
+Replay remains available for practice but does not provide unlimited XP farming.
+
+---
+
+# Gamification
+
+Implemented MVP gamification:
+
+```text
+XP             ✅
+Levels         ✅
+Challenges     ✅
+Achievements   ✅
+Badges         ✅
+Daily Streaks  ✅
+```
+
+For the MVP, an earned achievement also represents a badge.
+
+---
+
+# Database and Flyway
 
 Flyway owns the database schema.
 
-Current migrations:
-
-```text
-V1  Create user domain
-V2  Create wallet
-V3  Backfill child wallets
-V4  Create wallet transactions
-V5  Create simulation decisions
-V6  Add simulation decision XP
-V7  Create learning and simulation catalog
-V8  Seed learning topics and simulations
-V9  Introduce simulation runs
-```
-
-Hibernate is configured with:
+Hibernate uses:
 
 ```text
 ddl-auto: validate
 ```
 
-Schema changes should therefore be made through Flyway migrations rather than Hibernate schema generation.
+Schema modifications must be performed through Flyway.
+
+Current migrations:
+
+```text
+V1   Create user domain
+V2   Create wallet
+V3   Backfill child wallets
+V4   Create wallet transactions
+
+V5   Create simulation decisions
+V6   Add simulation decision XP
+V7   Create learning and simulation catalog
+V8   Seed learning topics and simulations
+V9   Introduce simulation runs
+
+V10  Create challenge domain
+V11  Seed MVP challenges
+V12  Add financial skill scoring
+
+V13  Create main financial simulation
+V14  Add simulation scores
+
+V15  Remove legacy simulation
+V16  Rename main simulation to the final simulation domain
+
+V17  Add achievement system
+V18  Add streak system
+```
+
+V5–V9 are retained because already-applied Flyway migrations must remain immutable.
+
+The legacy simulation tables they introduced are removed by V15.
+
+The current application uses the consolidated simulation domain created through V13–V16.
 
 ---
 
-# Seeded Learning Content
+# Seeded Topics and Challenges
 
-Current topics:
+Financial topics:
 
 ```text
 Saving
@@ -404,14 +677,35 @@ Spending Decisions
 Investing Basics
 ```
 
-Current simulation scenarios:
+Initial challenge set covers:
+
+- Saving
+- Budgeting
+- Spending decisions
+- Investing
+- Risk management
+
+The MVP does not currently implement a separate lesson engine.
+
+---
+
+# API Documentation
+
+When the backend is running:
+
+Swagger UI:
 
 ```text
-SAVE_OR_SPEND_01
-PLAN_PURCHASE_02
+http://localhost:8081/swagger-ui.html
 ```
 
-Simulation content is stored in PostgreSQL rather than hardcoded in the service layer.
+OpenAPI specification:
+
+```text
+http://localhost:8081/v3/api-docs
+```
+
+Protected endpoints require a Bearer JWT.
 
 ---
 
@@ -431,9 +725,21 @@ run:
 .\mvnw.cmd clean test
 ```
 
-Tests start an isolated PostgreSQL container and apply Flyway migrations automatically.
+Tests use an isolated PostgreSQL container.
 
 The test database is independent from the local development database.
+
+Current integration coverage includes:
+
+- authentication
+- parent/child role isolation
+- challenges
+- simulation
+- financial skill scoring
+- achievements
+- streaks
+- parent dashboard
+- weekly/monthly reporting
 
 ---
 
@@ -450,15 +756,15 @@ Workflow:
 .github/workflows/backend-ci.yml
 ```
 
-The CI pipeline:
+Pipeline:
 
 ```text
 Checkout
 → Java 21
 → Maven
 → Testcontainers PostgreSQL
-→ Flyway migrations
-→ Backend tests
+→ Flyway
+→ Integration tests
 ```
 
 ---
@@ -467,84 +773,74 @@ Checkout
 
 Current security model:
 
-- Stateless authentication
-- JWT Bearer tokens
-- Password hashing
-- Parent-only protected APIs
-- Parent-child ownership validation
-- Unauthorized child access is rejected
-- Secrets are provided through environment variables
-- Unknown endpoints are denied by default
+- stateless authentication
+- JWT Bearer authentication
+- hashed passwords
+- `PARENT` and `CHILD` roles
+- parent-child ownership validation
+- role-isolated APIs
+- inactive accounts cannot log in
+- invalid credentials return unauthorized
+- unknown endpoints are denied by default
+- secrets are supplied through environment variables
 
 Real passwords, JWT secrets, and production credentials must never be committed.
 
 ---
 
-# Current Development Status
+# MVP Scope Status
 
-The backend foundation currently includes:
+Backend MVP:
 
 ```text
-Authentication foundation      ✅
-Parent domain                  ✅
-Child profile foundation       ✅
-Wallet                         ✅
-Simulation catalog             ✅
-Simulation decisions           ✅
-Replayable simulation runs     ✅
-XP / level foundation          ✅
-Progress API                   ✅
-PostgreSQL migrations          ✅
-Integration testing            ✅
-CI                             ✅
-Swagger / OpenAPI              ✅
+Authentication                  ✅
+Parent / Child                  ✅
+Wallet                          ✅
+Challenges                      ✅
+Simulation                      ✅
+Consequences                    ✅
+XP / Levels                     ✅
+Skill Scoring                   ✅
+Progress                        ✅
+Achievements / Badges           ✅
+Streaks                         ✅
+Parent Dashboard                ✅
+Weekly / Monthly Reports        ✅
+Security Coverage               ✅
+CI                              ✅
+API Documentation               ✅
 ```
 
-Still planned:
+Next major phase:
 
 ```text
-Child authentication
-Learning / lesson engine
-Practice / question engine
-Advanced simulation consequences
-Financial skill scoring
-Badges
-Achievements
-Streaks
-Challenges
-Parent reports and analytics
 Frontend / PWA
-Production deployment
-Observability and production hardening
+```
+
+After frontend integration:
+
+```text
+Final QA
+Deployment
+Production hardening
 ```
 
 ---
 
-# Planned Product Flow
+# Next Frontend Screens
 
-The target learning experience is:
+The MVP frontend should implement:
 
-```text
-Learn
-  ↓
-Practice
-  ↓
-Make a financial decision
-  ↓
-See the consequence
-  ↓
-Receive score / XP
-  ↓
-Track progress
-```
+1. Login / Registration
+2. Child Dashboard
+3. Virtual Wallet
+4. Challenges
+5. Simulation
+6. Result / Score
+7. Progress Dashboard
+8. Parent Dashboard
 
-The long-term skill model will evaluate areas such as:
-
-- Saving
-- Budgeting
-- Risk Management
-- Investment
-- Decision Making
+The frontend should consume the existing backend contract rather than introducing new backend product scope.
 
 ---
 
